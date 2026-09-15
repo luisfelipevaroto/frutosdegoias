@@ -28,9 +28,7 @@ export default function Home() {
       .finally(() => setCarregando(false));
   }, []);
 
-  const produtosFiltrados = produtos.filter(
-    (p) => p.categoria === categoriaAtiva
-  );
+  const produtosFiltrados = produtos.filter((p) => p.categoria === categoriaAtiva);
 
   return (
     <main className="mx-auto max-w-md pb-24">
@@ -78,7 +76,7 @@ export default function Home() {
               )}
             </div>
 
-            {produto.categoria === "monte_do_jeito" ? (
+            {produto.variacoes.length > 0 ? (
               <Link
                 href={`/produto/${produto.id}`}
                 className="text-brand-600 text-sm font-medium"
@@ -87,21 +85,21 @@ export default function Home() {
               </Link>
             ) : (
               <button
-                disabled={!aberta}
+                disabled={!aberta || produto.preco == null}
                 onClick={() =>
                   adicionarItem({
                     produtoId: produto.id,
                     nome: produto.nome,
-                    variacaoId: produto.variacoes[0].id,
-                    variacaoNome: produto.variacoes[0].nome,
+                    variacaoId: "unico",
+                    variacaoNome: "Unidade",
                     adicionais: [],
                     quantidade: 1,
-                    precoUnitario: produto.variacoes[0].preco,
+                    precoUnitario: produto.preco ?? 0,
                   })
                 }
                 className="flex items-center gap-2 text-sm font-medium disabled:opacity-40"
               >
-                R$ {produto.variacoes[0].preco.toFixed(2)}
+                R$ {(produto.preco ?? 0).toFixed(2)}
                 <span className="text-brand-600 text-lg">+</span>
               </button>
             )}
