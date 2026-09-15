@@ -2,11 +2,12 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import StatusLoja from "@/components/StatusLoja";
+import LojaHeader from "@/components/LojaHeader";
+import CarrinhoLateral from "@/components/CarrinhoLateral";
+import ProdutoCard from "@/components/ProdutoCard";
 import { getProdutos } from "@/lib/produtos";
 import { useCarrinho } from "@/lib/carrinho-context";
-import { Categoria, Produto } from "@/lib/types";
-import { lojaAberta } from "@/lib/types";
+import { Categoria, Produto, lojaAberta } from "@/lib/types";
 
 const categorias: { id: Categoria; label: string }[] = [
   { id: "picole", label: "Picolés" },
@@ -31,62 +32,41 @@ export default function Home() {
   const produtosFiltrados = produtos.filter((p) => p.categoria === categoriaAtiva);
 
   return (
-    <main className="mx-auto max-w-md pb-24">
-      <header className="bg-brand-600 px-4 py-4 text-white">
-        <div className="flex items-start justify-between">
-          <div>
-            <h1 className="text-base font-medium">Frutos de Goiás</h1>
-            <p className="text-xs text-white/80">Juiz de Fora · Centro</p>
-          </div>
-          <StatusLoja />
-        </div>
-      </header>
+    <main className="pb-24 lg:pb-8">
+      <LojaHeader />
 
-      <nav className="flex gap-2 overflow-x-auto px-4 py-3">
-        {categorias.map((c) => (
-          <button
-            key={c.id}
-            onClick={() => setCategoriaAtiva(c.id)}
-            className={`whitespace-nowrap rounded-full px-3 py-1.5 text-sm ${
-              categoriaAtiva === c.id
-                ? "bg-brand-600 text-white"
-                : "bg-white text-neutral-600 border border-neutral-200"
-            }`}
-          >
-            {c.label}
-          </button>
-        ))}
-      </nav>
-
-      <section className="px-4">
-        {carregando && (
-          <p className="py-6 text-center text-sm text-neutral-400">
-            Carregando cardápio...
-          </p>
-        )}
-        {produtosFiltrados.map((produto) => (
-          <div
-            key={produto.id}
-            className="flex items-center justify-between border-t border-neutral-200 py-3"
-          >
-            <div>
-              <p className="text-sm font-medium">{produto.nome}</p>
-              {produto.descricao && (
-                <p className="text-xs text-neutral-500">{produto.descricao}</p>
-              )}
-            </div>
-
-            {produto.variacoes.length > 0 ? (
-              <Link
-                href={`/produto/${produto.id}`}
-                className="text-brand-600 text-sm font-medium"
-              >
-                Escolher
-              </Link>
-            ) : (
+      <div className="mx-auto flex max-w-6xl gap-6 px-4 md:px-6">
+        <div className="flex-1">
+          {/* Categorias — sticky para ficar visível ao rolar, em qualquer tamanho de tela */}
+          <nav className="sticky top-0 z-10 -mx-4 flex gap-2 overflow-x-auto bg-neutral-50 px-4 py-3 md:mx-0 md:px-0">
+            {categorias.map((c) => (
               <button
-                disabled={!aberta || produto.preco == null}
-                onClick={() =>
+                key={c.id}
+                onClick={() => setCategoriaAtiva(c.id)}
+                className={`whitespace-nowrap rounded-full px-3 py-1.5 text-sm ${
+                  categoriaAtiva === c.id
+                    ? "bg-brand-600 text-white"
+                    : "border border-neutral-200 bg-white text-neutral-600"
+                }`}
+              >
+                {c.label}
+              </button>
+            ))}
+          </nav>
+
+          {carregando && (
+            <p className="py-6 text-center text-sm text-neutral-400">
+              Carregando cardápio...
+            </p>
+          )}
+
+          <section className="grid grid-cols-1 md:grid-cols-2 md:gap-4 lg:grid-cols-3">
+            {produtosFiltrados.map((produto) => (
+              <ProdutoCard
+                key={produto.id}
+                produto={produto}
+                aberta={aberta}
+                onAdicionar={() =>
                   adicionarItem({
                     produtoId: produto.id,
                     nome: produto.nome,
@@ -97,29 +77,28 @@ export default function Home() {
                     precoUnitario: produto.preco ?? 0,
                   })
                 }
-                className="flex items-center gap-2 text-sm font-medium disabled:opacity-40"
-              >
-                R$ {(produto.preco ?? 0).toFixed(2)}
-                <span className="text-brand-600 text-lg">+</span>
-              </button>
-            )}
-          </div>
-        ))}
-      </section>
+              />
+            ))}
+          </section>
 
-      {!aberta && (
-        <p className="mx-4 mt-4 rounded-lg bg-red-50 p-3 text-center text-sm text-red-700">
-          Estamos fechados no momento. Confira nosso horário de funcionamento.
-        </p>
-      )}
+          {!aberta && (
+            <p className="mx-4 mt-4 rounded-lg bg-red-50 p-3 text-center text-sm text-red-700 md:mx-0">
+              Estamos fechados no momento. Confira nosso horário de funcionamento.
+            </p>
+          )}
+        </div>
 
+        <CarrinhoLateral />
+      </div>
+
+      {/* Barra flutuante só no mobile — no desktop o carrinho já fica visível na lateral */}
       {itens.length > 0 && (
         <Link
           href="/carrinho"
-          className="fixed bottom-0 left-0 right-0 mx-auto max-w-md bg-brand-700 py-3 text-center text-sm font-medium text-white"
+          className="fixed bottom-0 left-0 right-0 bg-brand-700 py-3 text-center text-sm font-medium text-white lg:hidden"
         >
-          Ver carrinho · {itens.length} {itens.length === 1 ? "item" : "itens"} ·{" "}
-          R$ {subtotal.toFixed(2)}
+          Ver carrinho · {itens.length} {itens.length === 1 ? "item" : "itens"} · R${" "}
+          {subtotal.toFixed(2)}
         </Link>
       )}
     </main>

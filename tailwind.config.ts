@@ -5,15 +5,21 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // Ajuste estes tons para bater com o logo/identidade real da unidade
-        // (extrair do site frutosdegoias.com.br ou do material de marca do dono)
+        // Extraído da logo oficial (logo-frutos-de-goias-footer.svg):
+        // verde em gradiente (#005321 → #007732) como cor principal da marca.
         brand: {
-          50: "#fef3ea",
-          100: "#fbdfc2",
-          400: "#f0994f",
-          600: "#d9721f",
-          700: "#a8551a",
-          900: "#5c2d0e",
+          50: "#e7f4ec",
+          100: "#c3e4cf",
+          400: "#1f9455",
+          600: "#007732", // verde principal do gradiente da logo
+          700: "#005321", // verde escuro do gradiente da logo
+          900: "#003315",
+        },
+        // Amarelo de destaque, também extraído da logo (#FFE000)
+        accent: {
+          400: "#ffe64d",
+          DEFAULT: "#FFE000",
+          600: "#e0c400",
         },
       },
       borderRadius: {

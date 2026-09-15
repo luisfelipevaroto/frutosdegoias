@@ -7,6 +7,7 @@ create table produtos (
   nome text not null,
   descricao text,
   foto_url text,
+  preco numeric(10,2) default 2.00, -- usado só quando o produto NÃO tem variações (ex: picolé, sorvete, açaí simples)
   ativo boolean not null default true,
   criado_em timestamptz not null default now()
 );

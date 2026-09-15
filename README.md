@@ -41,7 +41,9 @@ Base do site/app de pedidos, sem taxa, para a unidade do Centro de Juiz de Fora.
 
 6. **Identidade visual**
    - As cores em `tailwind.config.ts` (`brand.*`) são provisórias — trocar pelas cores reais extraídas do logo/material de marca do dono
-   - Trocar as fotos de produto (hoje sem imagem) pelas fotos reais
+   - **Logo**: substitua `public/logo.png` pela logo real (ideal: quadrada, fundo transparente ou branco)
+   - **Capa do topo**: substitua `public/capa.jpg` por uma foto horizontal da loja/produtos (ideal: 1200x400px ou proporção parecida)
+   - **Fotos dos produtos**: suba as fotos no Supabase Storage (Storage → criar um bucket público, ex: "produtos") e cole a URL pública gerada no campo `foto_url` de cada produto na tabela `produtos`. O card do produto já está pronto pra exibir (`components/ProdutoCard.tsx`) — se não tiver `foto_url` preenchido, mostra um emoji de sorvete no lugar
 
 ## Rodando localmente
 
