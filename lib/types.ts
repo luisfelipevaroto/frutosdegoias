@@ -19,7 +19,8 @@ export interface Produto {
   descricao?: string;
   foto?: string;
   ativo: boolean;
-  variacoes: Variacao[];
+  preco?: number; // usado quando o produto NÃO tem variações (ex: picolé, sorvete)
+  variacoes: Variacao[]; // usado quando o produto TEM variações (ex: Monte do seu Jeito)
   adicionaisDisponiveis?: Adicional[]; // usado no "Monte do seu jeito"
 }
 
