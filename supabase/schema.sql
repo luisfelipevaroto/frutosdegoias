@@ -4,10 +4,12 @@
 create table produtos (
   id uuid primary key default gen_random_uuid(),
   categoria text not null check (categoria in ('sorvete', 'picole', 'acai', 'monte_do_jeito')),
+  subcategoria text, -- ex: 'tradicional', 'premium', 'kids', 'zero_lactose', 'paleta', 'proteico' (usado hoje só em picolé)
   nome text not null,
   descricao text,
   foto_url text,
   preco numeric(10,2) default 2.00, -- usado só quando o produto NÃO tem variações (ex: picolé, sorvete, açaí simples)
+  preco_promocional numeric(10,2), -- se preenchido e menor que `preco`, aparece como oferta
   ativo boolean not null default true,
   criado_em timestamptz not null default now()
 );

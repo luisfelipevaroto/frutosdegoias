@@ -19,6 +19,8 @@ Base do site/app de pedidos, sem taxa, para a unidade do Centro de Juiz de Fora.
    - Copiar `.env.local.example` para `.env.local` e preencher com os valores de Project Settings → API
    - Cadastrar as mesmas variáveis em Vercel → Settings → Environment Variables
    - Cadastrar os produtos reais nas tabelas `produtos`, `variacoes`, `adicionais` e `produto_adicionais` (via Table Editor do Supabase, por enquanto — o painel admin ainda não existe)
+   - **Subcategorias de picolé**: preencha a coluna `subcategoria` do produto com um destes valores: `tradicional`, `premium`, `kids`, `zero_lactose`, `paleta`, `proteico` — eles aparecem automaticamente na barra lateral (desktop) e em chips (celular), sem precisar mexer no código
+   - **Preço promocional**: preencha `preco_promocional` menor que `preco` para o produto aparecer com o selo "Oferta" e o preço riscado (funciona hoje só em produtos sem variação — picolé, sorvete, açaí simples)
 
 2. **Mercado Pago**
    - Criar aplicação no [Mercado Pago Developers](https://www.mercadopago.com.br/developers)

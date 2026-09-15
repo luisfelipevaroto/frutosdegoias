@@ -9,7 +9,7 @@ export async function getProdutos(): Promise<Produto[]> {
     .from("produtos")
     .select(
       `
-      id, categoria, nome, descricao, foto_url, ativo, preco,
+      id, categoria, subcategoria, nome, descricao, foto_url, ativo, preco, preco_promocional,
       variacoes ( id, nome, preco ),
       produto_adicionais ( adicionais ( id, nome, preco ) )
     `
@@ -24,11 +24,13 @@ export async function getProdutos(): Promise<Produto[]> {
   return (data ?? []).map((p: any) => ({
     id: p.id,
     categoria: p.categoria,
+    subcategoria: p.subcategoria ?? undefined,
     nome: p.nome,
     descricao: p.descricao ?? undefined,
     foto: p.foto_url ?? undefined,
     ativo: p.ativo,
     preco: p.preco ?? undefined,
+    precoPromocional: p.preco_promocional ?? undefined,
     variacoes: p.variacoes ?? [],
     adicionaisDisponiveis:
       p.produto_adicionais?.map((pa: any) => pa.adicionais) ?? undefined,
