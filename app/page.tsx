@@ -70,7 +70,7 @@ export default function Home() {
 
   return (
     <main className="pb-24 lg:pb-8">
-      <LojaHeader busca={busca} onBusca={setBusca} />
+      <LojaHeader busca={busca} onBusca={setBusca} quantidadeCarrinho={itens.length} />
 
       <div className="mx-auto flex max-w-6xl gap-6 px-4 md:px-6">
         <Sidebar produtos={produtos} categoriaAtiva={categoriaAtiva} subcategoriaAtiva={subcategoriaAtiva} onSelecionarCategoria={selecionarCategoria} onSelecionarSubcategoria={setSubcategoriaAtiva} />
