@@ -1,0 +1,32 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { supabase } from "@/lib/supabase";
+
+type Cliente = { id:string; nome:string; cpf:string; telefone:string; whatsapp?:string|null; endereco?:string|null; fidelidade_saldo:number; fidelidade_cupom_disponivel:boolean };
+
+export default function FidelidadeAdmin(){
+ const router=useRouter();
+ const [clientes,setClientes]=useState<Cliente[]>([]); const [ativo,setAtivo]=useState(false); const [busca,setBusca]=useState(""); const [valor,setValor]=useState<Record<string,string>>({}); const [msg,setMsg]=useState("");
+ async function carregar(){
+  const {data:{user}}=await supabase.auth.getUser(); if(!user){router.replace('/admin/login');return;}
+  const {data:admin}=await supabase.from('admin_users').select('user_id').eq('user_id',user.id).maybeSingle(); if(!admin){router.replace('/admin/login');return;}
+  const [{data:c},{data:cfg}]=await Promise.all([
+   supabase.from('clientes').select('id,nome,cpf,telefone,whatsapp,endereco,fidelidade_saldo,fidelidade_cupom_disponivel').order('nome'),
+   supabase.from('configuracoes_loja').select('valor').eq('chave','fidelidade').single()
+  ]);
+  setClientes((c??[]) as Cliente[]); setAtivo(Boolean((cfg?.valor as any)?.ativo));
+ }
+ useEffect(()=>{carregar()},[]);
+ async function alternar(){ const novo=!ativo; const {error}=await supabase.from('configuracoes_loja').update({valor:{ativo:novo,meta:100,desconto_percentual:10},atualizado_em:new Date().toISOString()}).eq('chave','fidelidade'); if(error)setMsg(error.message); else {setAtivo(novo);setMsg(novo?'Programa ativado.':'Programa desativado.');} }
+ async function lancar(id:string){ const v=Number((valor[id]||'').replace(',','.')); if(!v||v<=0)return; const {error}=await supabase.rpc('admin_lancar_compra_fidelidade',{p_cliente_id:id,p_valor:v,p_observacao:'Compra lançada manualmente - loja física'}); if(error)setMsg(error.message); else {setValor(x=>({...x,[id]:''}));setMsg('Compra registrada com sucesso.');await carregar();} }
+ const lista=clientes.filter(c=>`${c.nome} ${c.cpf} ${c.whatsapp||c.telefone}`.toLowerCase().includes(busca.toLowerCase()));
+ return <main className="min-h-screen bg-neutral-50 p-4 text-neutral-900"><div className="mx-auto max-w-5xl">
+  <div className="mb-5 flex items-center justify-between"><div><Link href="/admin" className="text-sm text-brand-700">← Voltar ao painel</Link><h1 className="mt-1 text-xl font-bold">Programa de fidelidade</h1><p className="text-sm text-neutral-500">A cada R$ 100 em compras, o cliente libera 10% de desconto. Após o uso, o ciclo reinicia.</p></div><button onClick={alternar} className={`rounded-lg px-4 py-2 text-sm font-semibold text-white ${ativo?'bg-green-600':'bg-neutral-500'}`}>{ativo?'Ativo':'Desativado'}</button></div>
+  {msg&&<div className="mb-4 rounded-lg bg-white p-3 text-sm shadow-sm">{msg}</div>}
+  <input value={busca} onChange={e=>setBusca(e.target.value)} placeholder="Buscar por nome, CPF ou WhatsApp" className="mb-4 w-full rounded-lg border bg-white px-3 py-2 text-sm"/>
+  <div className="space-y-3">{lista.map(c=><div key={c.id} className="rounded-xl border bg-white p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div><b>{c.nome}</b><p className="text-xs text-neutral-500">CPF {c.cpf} · {c.whatsapp||c.telefone}</p>{c.endereco&&<p className="mt-1 text-xs text-neutral-400">{c.endereco}</p>}</div><div className="text-right"><p className="font-bold">R$ {Number(c.fidelidade_saldo).toFixed(2)} / R$ 100,00</p><p className={`text-xs font-semibold ${c.fidelidade_cupom_disponivel?'text-green-700':'text-neutral-400'}`}>{c.fidelidade_cupom_disponivel?'Cupom de 10% liberado':'Acumulando compras'}</p></div></div><div className="mt-3 flex gap-2"><input inputMode="decimal" value={valor[c.id]||''} onChange={e=>setValor(v=>({...v,[c.id]:e.target.value}))} placeholder="Valor da compra na loja" className="min-w-0 flex-1 rounded-lg border px-3 py-2 text-sm"/><button disabled={!ativo} onClick={()=>lancar(c.id)} className="rounded-lg bg-brand-700 px-4 py-2 text-sm font-medium text-white disabled:opacity-40">Lançar compra</button></div></div>)}</div>
+ </div></main>
+}
