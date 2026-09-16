@@ -51,7 +51,7 @@ type Produto = {
   foto_url?: string | null;
   ativo: boolean;
   variacoes: { id: string; nome: string; preco: number }[];
-  produto_adicionais: { adicional_id: string; adicionais: Adicional | null }[];
+  produto_adicionais: { adicional_id: string; adicionais: Adicional[] | null }[];
 };
 
 const vazio: ProdutoForm = {
@@ -188,8 +188,8 @@ export default function Admin() {
     }
 
     const produtoId = produtoResult.data.id;
-
     const variacoesValidas = form.variacoes.filter((v) => v.nome.trim() && v.preco !== "");
+
     if (form.id) {
       const delVar = await supabase.from("variacoes").delete().eq("produto_id", produtoId);
       if (delVar.error) { setErro(delVar.error.message); setSalvando(false); return; }
@@ -317,8 +317,10 @@ export default function Admin() {
   );
 }
 
-function Card({ t, v }: { t: string; v: any }) { return <div className="rounded-xl border bg-white p-4"><div className="text-xs text-neutral-500">{t}</div><div className="mt-1 text-xl font-bold">{v}</div></div>; }
+function Card({ t, v }: { t: string; v: string | number }) {
+  return <div className="rounded-xl border bg-white p-4"><div className="text-xs text-neutral-500">{t}</div><div className="mt-1 text-xl font-semibold">{v}</div></div>;
+}
 
 function Order({ p, onStatus }: { p: any; onStatus: (id: string, status: string) => void }) {
-  return <div className="flex flex-col gap-3 border-t py-3 md:flex-row md:items-center"><div className="flex-1"><b>#{p.numero}</b> · {p.clientes?.nome ?? "Cliente"}<div className="text-xs text-neutral-500">{p.clientes?.telefone ?? ""} · {p.tipo_entrega} · {p.forma_pagamento}</div></div><b>R$ {Number(p.valor_total || 0).toFixed(2)}</b><select value={p.status_pedido} onChange={(e) => onStatus(p.id, e.target.value)} className="rounded-lg border p-2 text-sm">{Object.entries(statusLabels).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></div>;
+  return <div className="border-t py-3"><div className="flex flex-wrap items-center justify-between gap-2"><div><div className="font-medium">Pedido #{p.numero_pedido ?? p.id.slice(0, 8)}</div><div className="text-xs text-neutral-500">{p.clientes?.nome ?? "Cliente"} · {p.clientes?.telefone ?? ""}</div></div><div className="text-sm font-medium">R$ {Number(p.valor_total || 0).toFixed(2)}</div></div><div className="mt-2 flex flex-wrap items-center gap-2"><span className="rounded-full bg-neutral-100 px-2 py-1 text-xs">{statusLabels[p.status_pedido] ?? p.status_pedido}</span><select value={p.status_pedido} onChange={(e) => onStatus(p.id, e.target.value)} className="rounded-lg border px-2 py-1 text-xs"><option value="recebido">Recebido</option><option value="em_preparo">Em preparo</option><option value="saiu_para_entrega">Saiu para entrega</option><option value="entregue">Entregue</option></select></div></div>;
 }
