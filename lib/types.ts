@@ -1,16 +1,26 @@
-export type Categoria = "sorvete" | "picole" | "acai" | "monte_do_jeito";
+export type Categoria = "sorvete" | "picole" | "acai" | "monte_do_jeito" | "paleta";
 
-// Subcategorias usadas para separar as linhas de picolé.
-// Se no futuro quiser subcategorias em outras categorias, é só usar
-// o mesmo campo `subcategoria` nos produtos daquela categoria.
-export const SUBCATEGORIAS_PICOLE: { id: string; label: string }[] = [
-  { id: "tradicional", label: "Tradicional" },
-  { id: "premium", label: "Premium" },
-  { id: "kids", label: "Kids" },
-  { id: "zero_lactose", label: "Zero Lactose" },
-  { id: "paleta", label: "Paleta" },
-  { id: "proteico", label: "Proteico" },
-];
+// Rótulos amigáveis das subcategorias. Chave = valor gravado no banco.
+// Subcategoria que não estiver aqui ainda aparece normalmente (o rótulo vira
+// o próprio valor com espaços), então dá pra criar novas no banco sem mexer no código.
+export const ROTULOS_SUBCATEGORIA: Record<string, string> = {
+  tradicional: "Tradicional",
+  premium: "Premium",
+  gourmet: "Gourmet",
+  kids: "Kids",
+  proteica: "Proteica",
+  zero_acucar: "Zero Açúcar",
+  paleta: "Paleta",
+  tradicional_1_5_l: "Tradicional 1,5L",
+  premium_1_5_l: "Premium 1,5L",
+  zero_acucar_1_0_l: "Zero Açúcar 1L",
+  acai_1_0_l: "Açaí 1L",
+  acai_1_5_l: "Açaí 1,5L",
+};
+
+export function rotuloSubcategoria(id: string): string {
+  return ROTULOS_SUBCATEGORIA[id] ?? id.replace(/_/g, " ");
+}
 
 export interface Variacao {
   id: string;

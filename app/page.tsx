@@ -6,17 +6,10 @@ import LojaHeader from "@/components/LojaHeader";
 import CarrinhoLateral from "@/components/CarrinhoLateral";
 import ProdutoCard from "@/components/ProdutoCard";
 import ProdutoModal from "@/components/ProdutoModal";
-import Sidebar from "@/components/Sidebar";
+import Sidebar, { CATEGORIAS, subcategoriasDe } from "@/components/Sidebar";
 import { getProdutos } from "@/lib/produtos";
 import { useCarrinho } from "@/lib/carrinho-context";
-import { Categoria, Produto, lojaAberta } from "@/lib/types";
-
-const categorias: { id: Categoria; label: string }[] = [
-  { id: "picole", label: "Picolés" },
-  { id: "sorvete", label: "Sorvetes" },
-  { id: "acai", label: "Açaí" },
-  { id: "monte_do_jeito", label: "Monte do seu jeito" },
-];
+import { Categoria, Produto, lojaAberta, rotuloSubcategoria } from "@/lib/types";
 
 export default function Home() {
   const [categoriaAtiva, setCategoriaAtiva] = useState<Categoria>("picole");
@@ -39,6 +32,18 @@ export default function Home() {
       (subcategoriaAtiva === null || p.subcategoria === subcategoriaAtiva)
   );
 
+  const subsDaCategoria = subcategoriasDe(produtos, categoriaAtiva);
+  const categoriasComProduto = CATEGORIAS.filter((c) =>
+    produtos.some((p) => p.categoria === c.id)
+  );
+
+  function precoDe(p: Produto) {
+    const base = p.preco ?? 0;
+    return p.precoPromocional != null && p.precoPromocional < base
+      ? p.precoPromocional
+      : base;
+  }
+
   return (
     <main className="pb-24 lg:pb-8">
       <LojaHeader />
@@ -53,9 +58,9 @@ export default function Home() {
         />
 
         <div className="flex-1">
-          {/* Categorias — visível só no celular/tablet; no desktop isso é o Sidebar */}
+          {/* Categorias — só no celular/tablet; no desktop isso é o Sidebar */}
           <nav className="sticky top-0 z-10 -mx-4 flex gap-2 overflow-x-auto bg-neutral-50 px-4 py-3 lg:hidden">
-            {categorias.map((c) => (
+            {categoriasComProduto.map((c) => (
               <button
                 key={c.id}
                 onClick={() => {
@@ -73,8 +78,8 @@ export default function Home() {
             ))}
           </nav>
 
-          {/* Chips de subcategoria — visível no celular quando a categoria ativa tem subcategorias */}
-          {categoriaAtiva === "picole" && (
+          {/* Chips de subcategoria no celular */}
+          {subsDaCategoria.length > 0 && (
             <div className="-mx-4 mb-2 flex gap-2 overflow-x-auto px-4 lg:hidden">
               <button
                 onClick={() => setSubcategoriaAtiva(null)}
@@ -86,13 +91,7 @@ export default function Home() {
               >
                 Todos
               </button>
-              {Array.from(
-                new Set(
-                  produtos
-                    .filter((p) => p.categoria === "picole" && p.subcategoria)
-                    .map((p) => p.subcategoria as string)
-                )
-              ).map((s) => (
+              {subsDaCategoria.map((s) => (
                 <button
                   key={s}
                   onClick={() => setSubcategoriaAtiva(s)}
@@ -102,7 +101,7 @@ export default function Home() {
                       : "text-neutral-500"
                   }`}
                 >
-                  {s.replace("_", " ")}
+                  {rotuloSubcategoria(s)}
                 </button>
               ))}
             </div>
@@ -129,11 +128,7 @@ export default function Home() {
                     variacaoNome: "Unidade",
                     adicionais: [],
                     quantidade: 1,
-                    precoUnitario:
-                      produto.precoPromocional != null &&
-                      produto.precoPromocional < (produto.preco ?? 0)
-                        ? produto.precoPromocional
-                        : produto.preco ?? 0,
+                    precoUnitario: precoDe(produto),
                   })
                 }
               />
@@ -165,7 +160,6 @@ export default function Home() {
         />
       )}
 
-      {/* Barra flutuante só no mobile — no desktop o carrinho já fica visível na lateral */}
       {itens.length > 0 && (
         <Link
           href="/carrinho"
