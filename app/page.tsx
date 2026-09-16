@@ -6,14 +6,19 @@ import LojaHeader from "@/components/LojaHeader";
 import CarrinhoLateral from "@/components/CarrinhoLateral";
 import ProdutoCard from "@/components/ProdutoCard";
 import ProdutoModal from "@/components/ProdutoModal";
-import Sidebar, { CATEGORIAS, subcategoriasDe } from "@/components/Sidebar";
+import Sidebar, { CATEGORIAS, CategoriaCatalogo, subcategoriasDe } from "@/components/Sidebar";
 import { getProdutos } from "@/lib/produtos";
 import { useCarrinho } from "@/lib/carrinho-context";
-import { Categoria, Produto, lojaAberta, rotuloSubcategoria } from "@/lib/types";
+import { Produto, lojaAberta, rotuloSubcategoria } from "@/lib/types";
+
+function ePromocao(p: Produto) {
+  return p.precoPromocional != null && p.preco != null && p.precoPromocional < p.preco;
+}
 
 export default function Home() {
-  const [categoriaAtiva, setCategoriaAtiva] = useState<Categoria>("picole");
+  const [categoriaAtiva, setCategoriaAtiva] = useState<CategoriaCatalogo>("picole");
   const [subcategoriaAtiva, setSubcategoriaAtiva] = useState<string | null>(null);
+  const [busca, setBusca] = useState("");
   const [produtos, setProdutos] = useState<Produto[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [produtoAberto, setProdutoAberto] = useState<Produto | null>(null);
@@ -21,154 +26,82 @@ export default function Home() {
   const aberta = lojaAberta();
 
   useEffect(() => {
-    getProdutos()
-      .then(setProdutos)
-      .finally(() => setCarregando(false));
+    getProdutos().then(setProdutos).finally(() => setCarregando(false));
   }, []);
 
-  const produtosFiltrados = produtos.filter(
-    (p) =>
-      p.categoria === categoriaAtiva &&
-      (subcategoriaAtiva === null || p.subcategoria === subcategoriaAtiva)
-  );
+  const termo = busca.trim().toLocaleLowerCase("pt-BR");
+  const emBusca = termo.length > 0;
+
+  const produtosFiltrados = produtos.filter((p) => {
+    if (emBusca) return p.nome.toLocaleLowerCase("pt-BR").includes(termo);
+    if (categoriaAtiva === "promocoes") return ePromocao(p);
+    return p.categoria === categoriaAtiva && (subcategoriaAtiva === null || p.subcategoria === subcategoriaAtiva);
+  });
 
   const subsDaCategoria = subcategoriasDe(produtos, categoriaAtiva);
-  const categoriasComProduto = CATEGORIAS.filter((c) =>
-    produtos.some((p) => p.categoria === c.id)
-  );
+  const categoriasComProduto = CATEGORIAS.filter((c) => {
+    if (c.id === "promocoes") return produtos.some(ePromocao);
+    return produtos.some((p) => p.categoria === c.id);
+  });
+
+  function selecionarCategoria(c: CategoriaCatalogo) {
+    setCategoriaAtiva(c);
+    setSubcategoriaAtiva(null);
+    setBusca("");
+  }
 
   function precoDe(p: Produto) {
     const base = p.preco ?? 0;
-    return p.precoPromocional != null && p.precoPromocional < base
-      ? p.precoPromocional
-      : base;
+    return ePromocao(p) ? p.precoPromocional! : base;
   }
 
   return (
     <main className="pb-24 lg:pb-8">
-      <LojaHeader />
+      <LojaHeader busca={busca} onBusca={setBusca} />
 
       <div className="mx-auto flex max-w-6xl gap-6 px-4 md:px-6">
-        <Sidebar
-          produtos={produtos}
-          categoriaAtiva={categoriaAtiva}
-          subcategoriaAtiva={subcategoriaAtiva}
-          onSelecionarCategoria={setCategoriaAtiva}
-          onSelecionarSubcategoria={setSubcategoriaAtiva}
-        />
+        <Sidebar produtos={produtos} categoriaAtiva={categoriaAtiva} subcategoriaAtiva={subcategoriaAtiva} onSelecionarCategoria={selecionarCategoria} onSelecionarSubcategoria={setSubcategoriaAtiva} />
 
-        <div className="flex-1">
-          {/* Categorias — só no celular/tablet; no desktop isso é o Sidebar */}
-          <nav className="sticky top-0 z-10 -mx-4 flex gap-2 overflow-x-auto bg-neutral-50 px-4 py-3 lg:hidden">
+        <div className="min-w-0 flex-1">
+          <nav className="sticky top-0 z-10 -mx-4 flex min-w-0 gap-2 overflow-x-auto bg-neutral-50 px-4 py-3 lg:hidden">
             {categoriasComProduto.map((c) => (
-              <button
-                key={c.id}
-                onClick={() => {
-                  setCategoriaAtiva(c.id);
-                  setSubcategoriaAtiva(null);
-                }}
-                className={`whitespace-nowrap rounded-full px-3 py-1.5 text-sm ${
-                  categoriaAtiva === c.id
-                    ? "bg-brand-600 text-white"
-                    : "border border-neutral-200 bg-white text-neutral-600"
-                }`}
-              >
+              <button key={c.id} onClick={() => selecionarCategoria(c.id)} className={`shrink-0 whitespace-nowrap rounded-full px-3 py-1.5 text-sm ${categoriaAtiva === c.id && !emBusca ? "bg-brand-600 text-white" : "border border-neutral-200 bg-white text-neutral-600"}`}>
                 {c.label}
               </button>
             ))}
           </nav>
 
-          {/* Chips de subcategoria no celular */}
-          {subsDaCategoria.length > 0 && (
-            <div className="-mx-4 mb-2 flex gap-2 overflow-x-auto px-4 lg:hidden">
-              <button
-                onClick={() => setSubcategoriaAtiva(null)}
-                className={`whitespace-nowrap rounded-full px-3 py-1 text-xs ${
-                  subcategoriaAtiva === null
-                    ? "bg-brand-50 font-medium text-brand-700"
-                    : "text-neutral-500"
-                }`}
-              >
-                Todos
-              </button>
+          {subsDaCategoria.length > 0 && !emBusca && (
+            <div className="-mx-4 mb-2 flex min-w-0 gap-2 overflow-x-auto px-4 pb-1 lg:hidden">
+              <button onClick={() => setSubcategoriaAtiva(null)} className={`shrink-0 whitespace-nowrap rounded-full px-3 py-1.5 text-xs ${subcategoriaAtiva === null ? "bg-brand-50 font-medium text-brand-700" : "text-neutral-500"}`}>Todos</button>
               {subsDaCategoria.map((s) => (
-                <button
-                  key={s}
-                  onClick={() => setSubcategoriaAtiva(s)}
-                  className={`whitespace-nowrap rounded-full px-3 py-1 text-xs ${
-                    subcategoriaAtiva === s
-                      ? "bg-brand-50 font-medium text-brand-700"
-                      : "text-neutral-500"
-                  }`}
-                >
+                <button key={s} onClick={() => setSubcategoriaAtiva(s)} className={`shrink-0 whitespace-nowrap rounded-full px-3 py-1.5 text-xs ${subcategoriaAtiva === s ? "bg-brand-50 font-medium text-brand-700" : "text-neutral-500"}`}>
                   {rotuloSubcategoria(s)}
                 </button>
               ))}
             </div>
           )}
 
-          {carregando && (
-            <p className="py-6 text-center text-sm text-neutral-400">
-              Carregando cardápio...
-            </p>
-          )}
+          {emBusca && <p className="mb-3 text-sm text-neutral-500">Resultados para <strong className="text-neutral-800">“{busca}”</strong></p>}
+
+          {carregando && <p className="py-6 text-center text-sm text-neutral-400">Carregando cardápio...</p>}
+
+          {!carregando && produtosFiltrados.length === 0 && <p className="rounded-xl bg-white p-6 text-center text-sm text-neutral-500">Nenhum produto encontrado.</p>}
 
           <section className="grid grid-cols-1 md:grid-cols-2 md:gap-4 lg:grid-cols-3">
             {produtosFiltrados.map((produto) => (
-              <ProdutoCard
-                key={produto.id}
-                produto={produto}
-                aberta={aberta}
-                onAbrirDetalhes={() => setProdutoAberto(produto)}
-                onAdicionarRapido={() =>
-                  adicionarItem({
-                    produtoId: produto.id,
-                    nome: produto.nome,
-                    variacaoId: "unico",
-                    variacaoNome: "Unidade",
-                    adicionais: [],
-                    quantidade: 1,
-                    precoUnitario: precoDe(produto),
-                  })
-                }
-              />
+              <ProdutoCard key={produto.id} produto={produto} aberta={aberta} onAbrirDetalhes={() => setProdutoAberto(produto)} onAdicionarRapido={() => adicionarItem({ produtoId: produto.id, nome: produto.nome, variacaoId: "unico", variacaoNome: "Unidade", adicionais: [], quantidade: 1, precoUnitario: precoDe(produto) })} />
             ))}
           </section>
 
-          {!aberta && (
-            <p className="mx-4 mt-4 rounded-lg bg-red-50 p-3 text-center text-sm text-red-700 md:mx-0">
-              Estamos fechados no momento. Confira nosso horário de funcionamento.
-            </p>
-          )}
+          {!aberta && <p className="mx-4 mt-4 rounded-lg bg-red-50 p-3 text-center text-sm text-red-700 md:mx-0">Estamos fechados no momento. Confira nosso horário de funcionamento.</p>}
         </div>
-
         <CarrinhoLateral />
       </div>
 
-      {produtoAberto && (
-        <ProdutoModal
-          produto={produtoAberto}
-          aberta={aberta}
-          onClose={() => setProdutoAberto(null)}
-          onAdicionar={(payload) =>
-            adicionarItem({
-              produtoId: produtoAberto.id,
-              nome: produtoAberto.nome,
-              ...payload,
-            })
-          }
-        />
-      )}
+      {produtoAberto && <ProdutoModal produto={produtoAberto} aberta={aberta} onClose={() => setProdutoAberto(null)} onAdicionar={(payload) => adicionarItem({ produtoId: produtoAberto.id, nome: produtoAberto.nome, ...payload })} />}
 
-      {itens.length > 0 && (
-        <Link
-          href="/carrinho"
-          className="fixed bottom-0 left-0 right-0 bg-brand-700 py-3 text-center text-sm font-medium text-white lg:hidden"
-        >
-          Ver carrinho · {itens.length} {itens.length === 1 ? "item" : "itens"} · R${" "}
-          {subtotal.toFixed(2)}
-        </Link>
-      )}
+      {itens.length > 0 && <Link href="/carrinho" className="fixed bottom-0 left-0 right-0 bg-brand-700 py-3 text-center text-sm font-medium text-white lg:hidden">Ver carrinho · {itens.length} {itens.length === 1 ? "item" : "itens"} · R$ {subtotal.toFixed(2)}</Link>}
     </main>
   );
 }
