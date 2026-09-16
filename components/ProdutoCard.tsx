@@ -26,7 +26,6 @@ export default function ProdutoCard({ produto, aberta, onAbrirDetalhes, onAdicio
       <div className="min-w-0 flex-1 md:p-3">
         <button onClick={onAbrirDetalhes} className="block w-full text-left">
           <p className="text-sm font-medium">{produto.nome}</p>
-          {produto.descricao && <p className="mt-0.5 text-xs text-neutral-500 md:line-clamp-2">{produto.descricao}</p>}
         </button>
 
         <div className="mt-1 flex items-center justify-between gap-2 md:mt-2">
