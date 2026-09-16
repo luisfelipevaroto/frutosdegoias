@@ -1,124 +1,32 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCarrinho } from "@/lib/carrinho-context";
 import { FormaPagamento, TipoEntrega } from "@/lib/types";
 
-// TODO: substituir pelo cálculo real (raio por km ou cotação Uber Direct)
-function calcularTaxaEntrega(endereco: string): number {
-  return endereco ? 6 : 0;
-}
+const CLIENTE_KEY = "frutos_cliente";
+type Cliente = { nome:string; cpf:string; whatsapp:string; endereco:string };
+function calcularTaxaEntrega(endereco:string){ return endereco ? 6 : 0; }
 
-export default function Checkout() {
-  const { itens, subtotal } = useCarrinho();
-  const [tipo, setTipo] = useState<TipoEntrega>("entrega");
-  const [endereco, setEndereco] = useState("");
-  const [horarioRetirada, setHorarioRetirada] = useState("");
-  const [pagamento, setPagamento] = useState<FormaPagamento>("pix");
-
-  const taxaEntrega = tipo === "entrega" ? calcularTaxaEntrega(endereco) : 0;
-  const total = subtotal + taxaEntrega;
-
-  // Retirada libera dinheiro na hora; entrega só Pix/cartão via Mercado Pago
-  const formasDisponiveis: FormaPagamento[] =
-    tipo === "entrega" ? ["pix", "cartao"] : ["dinheiro", "pix", "cartao"];
-
-  async function confirmarPedido() {
-    // TODO: chamar POST /api/pedidos com { itens, tipo, endereco ou horarioRetirada,
-    // taxaEntrega, pagamento, total, clienteId } e, se pix/cartão, criar a
-    // preferência de pagamento no Mercado Pago e redirecionar/checar status.
-    alert("Aqui entra a chamada real para /api/pedidos + Mercado Pago");
-  }
-
-  return (
-    <main className="mx-auto max-w-md p-4 pb-24">
-      <h1 className="mb-4 text-base font-medium">Como você quer receber?</h1>
-
-      <div className="mb-4 flex gap-2">
-        {(["entrega", "retirada"] as TipoEntrega[]).map((t) => (
-          <button
-            key={t}
-            onClick={() => setTipo(t)}
-            className={`flex-1 rounded-lg border py-3 text-sm font-medium capitalize ${
-              tipo === t
-                ? "border-brand-600 bg-brand-50 text-brand-700"
-                : "border-neutral-200 text-neutral-500"
-            }`}
-          >
-            {t}
-          </button>
-        ))}
-      </div>
-
-      {tipo === "entrega" ? (
-        <div className="mb-4">
-          <label className="mb-1 block text-xs text-neutral-500">
-            Endereço de entrega (Centro de Juiz de Fora)
-          </label>
-          <input
-            value={endereco}
-            onChange={(e) => setEndereco(e.target.value)}
-            placeholder="Rua, número, bairro"
-            className="w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm"
-          />
-        </div>
-      ) : (
-        <div className="mb-4">
-          <label className="mb-1 block text-xs text-neutral-500">
-            Horário de retirada (seg-sex 11h-19h, sáb-dom 11h-17h)
-          </label>
-          <input
-            type="time"
-            value={horarioRetirada}
-            onChange={(e) => setHorarioRetirada(e.target.value)}
-            className="w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm"
-          />
-        </div>
-      )}
-
-      <label className="mb-1 block text-xs text-neutral-500">
-        Forma de pagamento
-      </label>
-      <div className="mb-4 flex gap-2">
-        {formasDisponiveis.map((f) => (
-          <button
-            key={f}
-            onClick={() => setPagamento(f)}
-            className={`flex-1 rounded-lg border py-2 text-sm capitalize ${
-              pagamento === f
-                ? "border-brand-600 bg-brand-50 text-brand-700"
-                : "border-neutral-200 text-neutral-500"
-            }`}
-          >
-            {f}
-          </button>
-        ))}
-      </div>
-
-      <div className="border-t border-neutral-200 pt-3 text-sm">
-        <div className="flex justify-between text-neutral-500">
-          <span>Subtotal</span>
-          <span>R$ {subtotal.toFixed(2)}</span>
-        </div>
-        {tipo === "entrega" && (
-          <div className="flex justify-between text-neutral-500">
-            <span>Taxa de entrega</span>
-            <span>R$ {taxaEntrega.toFixed(2)}</span>
-          </div>
-        )}
-        <div className="mt-1 flex justify-between font-medium">
-          <span>Total</span>
-          <span>R$ {total.toFixed(2)}</span>
-        </div>
-      </div>
-
-      <button
-        onClick={confirmarPedido}
-        disabled={itens.length === 0}
-        className="mt-4 w-full rounded-lg bg-brand-700 py-3 text-sm font-medium text-white disabled:opacity-40"
-      >
-        Confirmar pedido
-      </button>
-    </main>
-  );
+export default function Checkout(){
+ const router=useRouter(); const {itens,subtotal,limpar}=useCarrinho();
+ const [cliente,setCliente]=useState<Cliente|null>(null); const [tipo,setTipo]=useState<TipoEntrega>("entrega"); const [endereco,setEndereco]=useState(""); const [horarioRetirada,setHorarioRetirada]=useState(""); const [pagamento,setPagamento]=useState<FormaPagamento>("pix"); const [enviando,setEnviando]=useState(false); const [erro,setErro]=useState("");
+ useEffect(()=>{try{const s=localStorage.getItem(CLIENTE_KEY);if(s){const c=JSON.parse(s) as Cliente;setCliente(c);setEndereco(c.endereco||"")}}catch{}},[]);
+ const taxaEntrega=tipo==="entrega"?calcularTaxaEntrega(endereco):0; const total=subtotal+taxaEntrega;
+ const formas:FormaPagamento[]=tipo==="entrega"?["pix","cartao"]:["dinheiro","pix","cartao"];
+ function salvarEndereco(v:string){setEndereco(v);if(cliente){const c={...cliente,endereco:v};setCliente(c);localStorage.setItem(CLIENTE_KEY,JSON.stringify(c));}}
+ async function confirmarPedido(){
+  if(!cliente){router.push('/cadastro');return;} if(tipo==='entrega'&&!endereco.trim()){setErro('Informe o endereço de entrega.');return;} setEnviando(true);setErro('');
+  const r=await fetch('/api/pedidos',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({cliente:{nome:cliente.nome,cpf:cliente.cpf,telefone:cliente.whatsapp,whatsapp:cliente.whatsapp},tipoEntrega:tipo,endereco:tipo==='entrega'?endereco:null,horarioRetirada:tipo==='retirada'&&horarioRetirada?new Date(`${new Date().toISOString().slice(0,10)}T${horarioRetirada}:00`).toISOString():null,taxaEntrega,pagamento,itens})});
+  const data=await r.json();setEnviando(false);if(!r.ok){setErro(data.error||'Não foi possível criar o pedido.');return;} limpar();router.push(`/pedido/${data.numero}`);
+ }
+ return <main className="mx-auto max-w-md p-4 pb-24"><h1 className="mb-4 text-base font-medium">Como você quer receber?</h1>
+ {!cliente?<Link href="/cadastro" className="mb-4 block rounded-xl border border-brand-200 bg-brand-50 p-4 text-sm font-medium text-brand-700">Cadastre-se para continuar e participar do programa de fidelidade →</Link>:<div className="mb-4 rounded-xl border bg-white p-3"><div className="flex justify-between gap-3"><div><b className="text-sm">{cliente.nome}</b><p className="text-xs text-neutral-500">{cliente.whatsapp} · CPF {cliente.cpf}</p></div><Link href="/cadastro" className="text-xs text-brand-700">Editar cadastro</Link></div></div>}
+ <div className="mb-4 flex gap-2">{(["entrega","retirada"] as TipoEntrega[]).map(t=><button key={t} onClick={()=>setTipo(t)} className={`flex-1 rounded-lg border py-3 text-sm font-medium capitalize ${tipo===t?'border-brand-600 bg-brand-50 text-brand-700':'border-neutral-200 text-neutral-500'}`}>{t}</button>)}</div>
+ {tipo==='entrega'?<div className="mb-4"><label className="mb-1 block text-xs text-neutral-500">Endereço de entrega</label><textarea value={endereco} onChange={e=>salvarEndereco(e.target.value)} placeholder="Rua, número, complemento e bairro" className="min-h-20 w-full rounded-lg border px-3 py-2 text-sm"/><p className="mt-1 text-xs text-neutral-400">Este endereço ficará salvo neste aparelho e poderá ser editado a qualquer momento.</p></div>:<div className="mb-4"><label className="mb-1 block text-xs text-neutral-500">Horário de retirada</label><input type="time" value={horarioRetirada} onChange={e=>setHorarioRetirada(e.target.value)} className="w-full rounded-lg border px-3 py-2 text-sm"/></div>}
+ <label className="mb-1 block text-xs text-neutral-500">Forma de pagamento</label><div className="mb-4 flex gap-2">{formas.map(f=><button key={f} onClick={()=>setPagamento(f)} className={`flex-1 rounded-lg border py-2 text-sm capitalize ${pagamento===f?'border-brand-600 bg-brand-50 text-brand-700':'border-neutral-200 text-neutral-500'}`}>{f}</button>)}</div>
+ <div className="border-t pt-3 text-sm"><div className="flex justify-between text-neutral-500"><span>Subtotal</span><span>R$ {subtotal.toFixed(2)}</span></div>{tipo==='entrega'&&<div className="flex justify-between text-neutral-500"><span>Taxa de entrega</span><span>R$ {taxaEntrega.toFixed(2)}</span></div>}<div className="mt-1 flex justify-between font-medium"><span>Total</span><span>R$ {total.toFixed(2)}</span></div></div>
+ {erro&&<p className="mt-3 rounded-lg bg-red-50 p-3 text-sm text-red-700">{erro}</p>}<button onClick={confirmarPedido} disabled={itens.length===0||enviando} className="mt-4 w-full rounded-lg bg-brand-700 py-3 text-sm font-medium text-white disabled:opacity-40">{enviando?'Enviando...':'Confirmar pedido'}</button></main>
 }
