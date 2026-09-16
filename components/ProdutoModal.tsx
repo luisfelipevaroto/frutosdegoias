@@ -66,9 +66,16 @@ export default function ProdutoModal({ produto, aberta, onClose, onAdicionar }: 
           </button>
         </div>
 
-        <div className="relative h-56 w-full bg-neutral-100">
+        {/* Imagem do produto em formato quadrado, sem cortar a foto */}
+        <div className="relative aspect-square w-full bg-neutral-100">
           {produto.foto ? (
-            <Image src={produto.foto} alt={produto.nome} fill className="object-cover" />
+            <Image
+              src={produto.foto}
+              alt={produto.nome}
+              fill
+              className="object-contain"
+              sizes="(max-width: 768px) 100vw, 448px"
+            />
           ) : (
             <div className="flex h-full items-center justify-center text-5xl">🍨</div>
           )}
