@@ -1,8 +1,5 @@
 export type Categoria = "sorvete" | "picole" | "acai" | "monte_do_jeito" | "paleta";
 
-// Rótulos amigáveis das subcategorias. Chave = valor gravado no banco.
-// Subcategoria que não estiver aqui ainda aparece normalmente (o rótulo vira
-// o próprio valor com espaços), então dá pra criar novas no banco sem mexer no código.
 export const ROTULOS_SUBCATEGORIA: Record<string, string> = {
   tradicional: "Tradicional",
   premium: "Premium",
@@ -24,7 +21,7 @@ export function rotuloSubcategoria(id: string): string {
 
 export interface Variacao {
   id: string;
-  nome: string; // "unidade", "300ml", "500ml"
+  nome: string;
   preco: number;
 }
 
@@ -37,15 +34,16 @@ export interface Adicional {
 export interface Produto {
   id: string;
   categoria: Categoria;
-  subcategoria?: string; // ex: "tradicional", "premium" — hoje usado só em picolé
+  subcategoria?: string;
   nome: string;
   descricao?: string;
   foto?: string;
   ativo: boolean;
-  preco?: number; // usado quando o produto NÃO tem variações (ex: picolé, sorvete)
-  precoPromocional?: number; // se preenchido e menor que `preco`, mostra como oferta
-  variacoes: Variacao[]; // usado quando o produto TEM variações (ex: Monte do seu Jeito)
-  adicionaisDisponiveis?: Adicional[]; // usado no "Monte do seu jeito"
+  ordem?: number;
+  preco?: number;
+  precoPromocional?: number;
+  variacoes: Variacao[];
+  adicionaisDisponiveis?: Adicional[];
 }
 
 export interface ItemCarrinho {
@@ -64,7 +62,7 @@ export type FormaPagamento = "pix" | "cartao" | "dinheiro";
 export type StatusPedido =
   | "recebido"
   | "em_preparo"
-  | "saiu_para_entrega" // ou "pronto_para_retirada"
+  | "saiu_para_entrega"
   | "entregue";
 
 export interface Cliente {
@@ -73,7 +71,7 @@ export interface Cliente {
   telefone: string;
   cpf: string;
   endereco?: string;
-  gastoAcumuladoFidelidade: number; // reseta ao usar o desconto de 10%
+  gastoAcumuladoFidelidade: number;
   cupomDisponivel: boolean;
 }
 
@@ -98,11 +96,9 @@ export const HORARIO_FUNCIONAMENTO = {
 };
 
 export function lojaAberta(data: Date = new Date()): boolean {
-  const dia = data.getDay(); // 0 = domingo, 6 = sábado
+  const dia = data.getDay();
   const hora = data.getHours() + data.getMinutes() / 60;
   const { abre, fecha } =
-    dia === 0 || dia === 6
-      ? HORARIO_FUNCIONAMENTO.sabDom
-      : HORARIO_FUNCIONAMENTO.segSex;
+    dia === 0 || dia === 6 ? HORARIO_FUNCIONAMENTO.sabDom : HORARIO_FUNCIONAMENTO.segSex;
   return hora >= abre && hora < fecha;
 }
