@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import LojaHeader from "@/components/LojaHeader";
 import CarrinhoLateral from "@/components/CarrinhoLateral";
@@ -19,6 +19,7 @@ export default function Home() {
   const [categoriaAtiva, setCategoriaAtiva] = useState<CategoriaCatalogo>("picole");
   const [subcategoriaAtiva, setSubcategoriaAtiva] = useState<string | null>(null);
   const [busca, setBusca] = useState("");
+  const [ordenacao, setOrdenacao] = useState<"aleatoria" | "cadastro" | "alfabetica">("cadastro");
   const [produtos, setProdutos] = useState<Produto[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [produtoAberto, setProdutoAberto] = useState<Produto | null>(null);
@@ -32,11 +33,23 @@ export default function Home() {
   const termo = busca.trim().toLocaleLowerCase("pt-BR");
   const emBusca = termo.length > 0;
 
-  const produtosFiltrados = produtos.filter((p) => {
-    if (emBusca) return p.nome.toLocaleLowerCase("pt-BR").includes(termo);
-    if (categoriaAtiva === "promocoes") return ePromocao(p);
-    return p.categoria === categoriaAtiva && (subcategoriaAtiva === null || p.subcategoria === subcategoriaAtiva);
-  });
+  const produtosFiltrados = useMemo(() => {
+    const filtrados = produtos.filter((p) => {
+      if (emBusca) return p.nome.toLocaleLowerCase("pt-BR").includes(termo);
+      if (categoriaAtiva === "promocoes") return ePromocao(p);
+      return p.categoria === categoriaAtiva && (subcategoriaAtiva === null || p.subcategoria === subcategoriaAtiva);
+    });
+
+    if (ordenacao === "alfabetica") {
+      return [...filtrados].sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
+    }
+
+    if (ordenacao === "aleatoria") {
+      return [...filtrados].sort(() => Math.random() - 0.5);
+    }
+
+    return [...filtrados].sort((a, b) => (a.ordem ?? 0) - (b.ordem ?? 0) || a.nome.localeCompare(b.nome, "pt-BR"));
+  }, [produtos, categoriaAtiva, subcategoriaAtiva, termo, emBusca, ordenacao]);
 
   const subsDaCategoria = subcategoriasDe(produtos, categoriaAtiva);
   const categoriasComProduto = CATEGORIAS.filter((c) => {
@@ -81,6 +94,14 @@ export default function Home() {
               ))}
             </div>
           )}
+
+          <div className="mb-3 flex justify-end">
+            <select value={ordenacao} onChange={(e) => setOrdenacao(e.target.value as typeof ordenacao)} className="rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-700 outline-none focus:border-brand-500">
+              <option value="cadastro">Ordem de cadastro</option>
+              <option value="aleatoria">Ordem aleatória</option>
+              <option value="alfabetica">Ordem alfabética</option>
+            </select>
+          </div>
 
           {emBusca && <p className="mb-3 text-sm text-neutral-500">Resultados para <strong className="text-neutral-800">“{busca}”</strong></p>}
 
