@@ -1,8 +1,8 @@
 "use client";
 
-import { Categoria, Produto, rotuloSubcategoria } from "@/lib/types";
+import { Produto, rotuloCategoria, rotuloSubcategoria } from "@/lib/types";
 
-export type CategoriaCatalogo = Categoria | "promocoes";
+export type CategoriaCatalogo = string;
 
 interface Props {
   produtos: Produto[];
@@ -12,20 +12,17 @@ interface Props {
   onSelecionarSubcategoria: (s: string | null) => void;
 }
 
-export const CATEGORIAS: { id: CategoriaCatalogo; label: string }[] = [
-  { id: "picole", label: "Picolés" },
-  { id: "sorvete", label: "Sorvetes" },
-  { id: "paleta", label: "Paletas" },
-  { id: "acai", label: "Açaí" },
-  { id: "monte_do_jeito", label: "Monte do seu jeito" },
-  { id: "promocoes", label: "Promoções" },
-];
+export function categoriasDe(produtos: Produto[]) {
+  const ids = Array.from(new Set(produtos.map((p) => p.categoria).filter(Boolean)));
+  const categorias = ids.map((id) => ({ id, label: rotuloCategoria(id) }));
+  const temPromocao = produtos.some(ePromocao);
+  if (temPromocao) categorias.push({ id: "promocoes", label: "Promoções" });
+  return categorias;
+}
 
 export function subcategoriasDe(produtos: Produto[], categoria: CategoriaCatalogo): string[] {
   if (categoria === "promocoes") return [];
-  return Array.from(new Set(
-    produtos.filter((p) => p.categoria === categoria && p.subcategoria).map((p) => p.subcategoria as string)
-  )).sort();
+  return Array.from(new Set(produtos.filter((p) => p.categoria === categoria && p.subcategoria).map((p) => p.subcategoria as string))).sort();
 }
 
 function ePromocao(p: Produto) {
@@ -33,22 +30,17 @@ function ePromocao(p: Produto) {
 }
 
 export default function Sidebar({ produtos, categoriaAtiva, subcategoriaAtiva, onSelecionarCategoria, onSelecionarSubcategoria }: Props) {
+  const categorias = categoriasDe(produtos);
   return (
     <aside className="hidden w-56 shrink-0 lg:block">
       <nav className="sticky top-4 space-y-1">
-        {CATEGORIAS.map((c) => {
-          const total = c.id === "promocoes"
-            ? produtos.filter(ePromocao).length
-            : produtos.filter((p) => p.categoria === c.id).length;
-          if (total === 0) return null;
+        {categorias.map((c) => {
+          const total = c.id === "promocoes" ? produtos.filter(ePromocao).length : produtos.filter((p) => p.categoria === c.id).length;
           const ativa = categoriaAtiva === c.id;
           const subs = subcategoriasDe(produtos, c.id);
           return (
             <div key={c.id}>
-              <button
-                onClick={() => { onSelecionarCategoria(c.id); onSelecionarSubcategoria(null); }}
-                className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm ${ativa ? "bg-brand-50 font-medium text-brand-700" : "text-neutral-600"}`}
-              >
+              <button onClick={() => { onSelecionarCategoria(c.id); onSelecionarSubcategoria(null); }} className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm ${ativa ? "bg-brand-50 font-medium text-brand-700" : "text-neutral-600"}`}>
                 {c.label}<span className="text-xs text-neutral-400">{total}</span>
               </button>
               {ativa && subs.length > 0 && (
