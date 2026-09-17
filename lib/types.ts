@@ -1,4 +1,4 @@
-export type Categoria = "sorvete" | "picole" | "acai" | "monte_do_jeito" | "paleta";
+export type Categoria = string;
 
 export const ROTULOS_SUBCATEGORIA: Record<string, string> = {
   tradicional: "Tradicional",
@@ -19,86 +19,49 @@ export function rotuloSubcategoria(id: string): string {
   return ROTULOS_SUBCATEGORIA[id] ?? id.replace(/_/g, " ");
 }
 
-export interface Variacao {
-  id: string;
-  nome: string;
-  preco: number;
+export function rotuloCategoria(id: string): string {
+  const conhecidos: Record<string, string> = {
+    picole: "Picolés",
+    sorvete: "Sorvetes",
+    paleta: "Paletas",
+    acai: "Açaí",
+    monte_do_jeito: "Monte do seu jeito",
+    hamburguer: "Hambúrgueres",
+    pizza: "Pizzas",
+    bebida: "Bebidas",
+    sobremesa: "Sobremesas",
+  };
+  if (conhecidos[id]) return conhecidos[id];
+  return id.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase());
 }
 
-export interface Adicional {
-  id: string;
-  nome: string;
-  preco: number;
-}
-
+export interface Variacao { id: string; nome: string; preco: number; }
+export interface Adicional { id: string; nome: string; preco: number; }
 export interface Produto {
-  id: string;
-  categoria: Categoria;
-  subcategoria?: string;
-  nome: string;
-  descricao?: string;
-  foto?: string;
-  ativo: boolean;
-  ordem?: number;
-  preco?: number;
-  precoPromocional?: number;
-  variacoes: Variacao[];
-  adicionaisDisponiveis?: Adicional[];
+  id: string; categoria: Categoria; subcategoria?: string; nome: string; descricao?: string;
+  foto?: string; ativo: boolean; ordem?: number; preco?: number; precoPromocional?: number;
+  variacoes: Variacao[]; adicionaisDisponiveis?: Adicional[];
 }
-
-export interface ItemCarrinho {
-  produtoId: string;
-  nome: string;
-  variacaoId: string;
-  variacaoNome: string;
-  adicionais: Adicional[];
-  quantidade: number;
-  precoUnitario: number;
-}
-
+export interface ItemCarrinho { produtoId:string; nome:string; variacaoId:string; variacaoNome:string; adicionais:Adicional[]; quantidade:number; precoUnitario:number; }
 export type TipoEntrega = "entrega" | "retirada";
 export type FormaPagamento = "pix" | "cartao" | "dinheiro";
+export type StatusPedido = "recebido" | "em_preparo" | "saiu_para_entrega" | "entregue";
+export interface Cliente { id:string; nome:string; telefone:string; cpf:string; endereco?:string; gastoAcumuladoFidelidade:number; cupomDisponivel:boolean; }
+export interface Pedido { id:string; clienteId:string; itens:ItemCarrinho[]; tipoEntrega:TipoEntrega; enderecoEntrega?:string; horarioRetirada?:string; taxaEntrega:number; formaPagamento:FormaPagamento; statusPagamento:"pendente"|"pago"; statusPedido:StatusPedido; valorTotal:number; criadoEm:string; }
 
-export type StatusPedido =
-  | "recebido"
-  | "em_preparo"
-  | "saiu_para_entrega"
-  | "entregue";
+export type HorarioDia = { abre?: string; fecha?: string; fechado?: boolean };
+export type HorariosLoja = Record<string, HorarioDia>;
 
-export interface Cliente {
-  id: string;
-  nome: string;
-  telefone: string;
-  cpf: string;
-  endereco?: string;
-  gastoAcumuladoFidelidade: number;
-  cupomDisponivel: boolean;
-}
+const NOMES_DIAS = ["domingo", "segunda", "terca", "quarta", "quinta", "sexta", "sabado"];
 
-export interface Pedido {
-  id: string;
-  clienteId: string;
-  itens: ItemCarrinho[];
-  tipoEntrega: TipoEntrega;
-  enderecoEntrega?: string;
-  horarioRetirada?: string;
-  taxaEntrega: number;
-  formaPagamento: FormaPagamento;
-  statusPagamento: "pendente" | "pago";
-  statusPedido: StatusPedido;
-  valorTotal: number;
-  criadoEm: string;
-}
-
-export const HORARIO_FUNCIONAMENTO = {
-  segSex: { abre: 11, fecha: 19 },
-  sabDom: { abre: 11, fecha: 17 },
-};
-
-export function lojaAberta(data: Date = new Date()): boolean {
-  const dia = data.getDay();
-  const hora = data.getHours() + data.getMinutes() / 60;
-  const { abre, fecha } =
-    dia === 0 || dia === 6 ? HORARIO_FUNCIONAMENTO.sabDom : HORARIO_FUNCIONAMENTO.segSex;
-  return hora >= abre && hora < fecha;
+export function lojaAberta(horarios?: HorariosLoja | null, data: Date = new Date()): boolean {
+  if (!horarios) return false;
+  const regra = horarios[NOMES_DIAS[data.getDay()]];
+  if (!regra || regra.fechado || !regra.abre || !regra.fecha) return false;
+  const minutos = data.getHours() * 60 + data.getMinutes();
+  const paraMinutos = (valor: string) => { const [h, m] = valor.split(":").map(Number); return h * 60 + m; };
+  const abre = paraMinutos(regra.abre);
+  const fecha = paraMinutos(regra.fecha);
+  if (fecha > abre) return minutos >= abre && minutos < fecha;
+  return minutos >= abre || minutos < fecha;
 }
