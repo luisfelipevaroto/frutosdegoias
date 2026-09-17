@@ -1,49 +1,6 @@
 "use client";
-
-import { useEffect, useState } from "react";
-import { getEmpresaAtual } from "@/lib/empresa";
-import { HorariosLoja, lojaAberta } from "@/lib/types";
-
-const NOMES_DIAS = ["domingo", "segunda", "terca", "quarta", "quinta", "sexta", "sabado"];
-
-export default function StatusLoja() {
-  const [aberta, setAberta] = useState<boolean | null>(null);
-  const [fecha, setFecha] = useState<string | null>(null);
-
-  useEffect(() => {
-    let ativo = true;
-    let intervalo: ReturnType<typeof setInterval> | null = null;
-
-    getEmpresaAtual().then((empresa) => {
-      if (!ativo) return;
-      const configuracoes = empresa?.configuracoes;
-      const horarios = configuracoes && typeof configuracoes === "object"
-        ? (configuracoes.horarios as HorariosLoja | undefined)
-        : undefined;
-
-      const checar = () => {
-        const agora = new Date();
-        setAberta(lojaAberta(horarios, agora));
-        const regra = horarios?.[NOMES_DIAS[agora.getDay()]];
-        setFecha(regra?.fecha ?? null);
-      };
-
-      checar();
-      intervalo = setInterval(checar, 60_000);
-    });
-
-    return () => {
-      ativo = false;
-      if (intervalo) clearInterval(intervalo);
-    };
-  }, []);
-
-  if (aberta === null) return null;
-
-  return (
-    <span className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${aberta ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}`}>
-      <span className="h-1.5 w-1.5 rounded-full bg-current" />
-      {aberta ? (fecha ? `Aberto até ${fecha}` : "Aberto agora") : "Fechado no momento"}
-    </span>
-  );
-}
+import{useEffect,useState}from"react";import{getEmpresaAtual}from"@/lib/empresa";import{HorariosLoja,lojaAberta}from"@/lib/types";
+const DIAS=["domingo","segunda","terca","quarta","quinta","sexta","sabado"];const ROTULOS=["domingo","segunda","terça","quarta","quinta","sexta","sábado"];
+function minutos(h?:string){if(!h)return-1;const[a,b]=h.split(':').map(Number);return a*60+b}
+function proximaAbertura(horarios:HorariosLoja|undefined,agora:Date){if(!horarios)return null;const atual=agora.getHours()*60+agora.getMinutes();for(let offset=0;offset<8;offset++){const idx=(agora.getDay()+offset)%7,regra=horarios[DIAS[idx]];if(!regra||regra.fechado||!regra.abre)continue;const abre=minutos(regra.abre);if(offset===0&&abre<=atual)continue;const dia=offset===0?'hoje':offset===1?'amanhã':ROTULOS[idx];return `${dia} às ${regra.abre}`;}return null}
+export default function StatusLoja(){const[aberta,setAberta]=useState<boolean|null>(null),[fecha,setFecha]=useState<string|null>(null),[proxima,setProxima]=useState<string|null>(null);useEffect(()=>{let ativo=true,intervalo:ReturnType<typeof setInterval>|null=null;getEmpresaAtual().then(empresa=>{if(!ativo)return;const cfg=empresa?.configuracoes;const horarios=cfg&&typeof cfg==='object'?(cfg.horarios as HorariosLoja|undefined):undefined;const checar=()=>{const agora=new Date(),estaAberta=lojaAberta(horarios,agora),regra=horarios?.[DIAS[agora.getDay()]];setAberta(estaAberta);setFecha(estaAberta?regra?.fecha??null:null);setProxima(estaAberta?null:proximaAbertura(horarios,agora))};checar();intervalo=setInterval(checar,60000)});return()=>{ativo=false;if(intervalo)clearInterval(intervalo)}},[]);if(aberta===null)return null;return <span className={`inline-flex flex-col rounded-lg px-3 py-1.5 text-xs font-medium ${aberta?'bg-green-100 text-green-800':'bg-red-100 text-red-800'}`}><span className="flex items-center gap-1.5"><span className="h-1.5 w-1.5 rounded-full bg-current"/>{aberta?(fecha?`Aberto até ${fecha}`:'Aberto agora'):'Loja fechada'}</span>{!aberta&&proxima&&<span className="mt-0.5 pl-3 text-[11px] font-normal opacity-80">Abre {proxima}</span>}</span>}
