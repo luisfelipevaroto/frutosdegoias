@@ -4,16 +4,14 @@ import { supabase } from "@/lib/supabase";
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { cliente, tipoEntrega, endereco, horarioRetirada, taxaEntrega, pagamento, itens, usarFidelidade } = body;
+    const { cliente, tipoEntrega, endereco, horarioRetirada, taxaEntrega, pagamento, itens, usarFidelidade, empresaId } = body;
+    if (!empresaId) return NextResponse.json({ error: "Empresa não identificada" }, { status: 400 });
     if (!Array.isArray(itens) || itens.length === 0) return NextResponse.json({ error: "Carrinho vazio" }, { status: 400 });
     const { data, error } = await supabase.rpc("criar_pedido", {
-      p_cliente: cliente ?? {},
-      p_tipo_entrega: tipoEntrega,
-      p_endereco_entrega: endereco ?? null,
-      p_horario_retirada: horarioRetirada ?? null,
-      p_taxa_entrega: Number(taxaEntrega ?? 0),
-      p_forma_pagamento: pagamento,
-      p_itens: itens.map((i:any) => ({ produto_id: i.produtoId, variacao_id: i.variacaoId || null, adicionais_ids: (i.adicionais ?? []).map((a:any)=>a.id), quantidade: i.quantidade })),
+      p_empresa_id: empresaId,
+      p_cliente: cliente ?? {}, p_tipo_entrega: tipoEntrega, p_endereco_entrega: endereco ?? null,
+      p_horario_retirada: horarioRetirada ?? null, p_taxa_entrega: Number(taxaEntrega ?? 0), p_forma_pagamento: pagamento,
+      p_itens: itens.map((i:any) => ({ produto_id:i.produtoId,variacao_id:i.variacaoId||null,adicionais_ids:(i.adicionais??[]).map((a:any)=>a.id),quantidade:i.quantidade })),
       p_usar_fidelidade: Boolean(usarFidelidade),
     });
     if (error) return NextResponse.json({ error: error.message }, { status: 400 });
