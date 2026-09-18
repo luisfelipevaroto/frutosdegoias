@@ -9,7 +9,7 @@ export interface Variacao { id:string;nome:string;preco:number }
 export interface Adicional { id:string;nome:string;preco:number }
 export interface Produto { id:string;categoria:Categoria;categoriaId?:string;categoriaOrdem?:number;subcategoria?:string;subcategoriaId?:string;subcategoriaOrdem?:number;nome:string;descricao?:string;foto?:string;ativo:boolean;ordem?:number;preco?:number;precoPromocional?:number;variacoes:Variacao[];adicionaisDisponiveis?:Adicional[] }
 export interface ItemCarrinho { produtoId:string;nome:string;variacaoId:string;variacaoNome:string;adicionais:Adicional[];quantidade:number;precoUnitario:number }
-export type TipoEntrega="entrega"|"retirada";export type FormaPagamento="pix"|"cartao"|"dinheiro";export type StatusPedido="recebido"|"em_preparo"|"saiu_para_entrega"|"entregue";
+export type TipoEntrega="entrega"|"retirada";export type FormaPagamento="pix"|"cartao"|"dinheiro";export type StatusPedido="recebido"|"em_preparo"|"saiu_para_entrega"|"entregue"|"cancelado";
 export interface Cliente{id:string;nome:string;telefone:string;cpf:string;endereco?:string;gastoAcumuladoFidelidade:number;cupomDisponivel:boolean}
 export interface Pedido{id:string;clienteId:string;itens:ItemCarrinho[];tipoEntrega:TipoEntrega;enderecoEntrega?:string;horarioRetirada?:string;taxaEntrega:number;formaPagamento:FormaPagamento;statusPagamento:"pendente"|"pago";statusPedido:StatusPedido;valorTotal:number;criadoEm:string}
 export type HorarioDia={abre?:string;fecha?:string;fechado?:boolean};export type HorariosLoja=Record<string,HorarioDia>;const NOMES_DIAS=["domingo","segunda","terca","quarta","quinta","sexta","sabado"];
