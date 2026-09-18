@@ -17,7 +17,7 @@ export type Empresa = {
   configuracoes?: Record<string, unknown>;
 };
 
-export const EMPRESA_STORAGE_KEY = "frutos_empresa";
+export const EMPRESA_STORAGE_KEY = "delivery_empresa";
 const DOMINIO_PADRAO = "frutos-de-goias-jf.vercel.app";
 
 export function dominioAtual() {
