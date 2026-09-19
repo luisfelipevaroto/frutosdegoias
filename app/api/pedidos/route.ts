@@ -11,7 +11,7 @@ export async function POST(request: Request) {
       p_empresa_id: empresaId,
       p_cliente: cliente ?? {}, p_tipo_entrega: tipoEntrega, p_endereco_entrega: endereco ?? null,
       p_horario_retirada: horarioRetirada ?? null, p_taxa_entrega: Number(taxaEntrega ?? 0), p_forma_pagamento: pagamento,
-      p_itens: itens.map((i:any) => ({ produto_id:i.produtoId,variacao_id:i.variacaoId||null,adicionais_ids:(i.adicionais??[]).map((a:any)=>a.id),quantidade:i.quantidade })),
+      p_itens: itens.map((i:any) => ({ produto_id:i.produtoId,variacao_id:(!i.variacaoId||i.variacaoId==='unico'||i.variacaoId==='único')?null:i.variacaoId,adicionais_ids:(i.adicionais??[]).map((a:any)=>a.id),quantidade:i.quantidade })),
       p_usar_fidelidade: Boolean(usarFidelidade),
     });
     if (error) return NextResponse.json({ error: error.message }, { status: 400 });
