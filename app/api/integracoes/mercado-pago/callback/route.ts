@@ -1,0 +1,1 @@
+import{NextResponse}from'next/server';export async function GET(req:Request){const u=new URL(req.url),x=new URL('/admin/integracoes',req.url);x.searchParams.set('mp',u.searchParams.get('code')?'autorizado':'erro');return NextResponse.redirect(x)}
