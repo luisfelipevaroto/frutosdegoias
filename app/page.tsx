@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import LojaHeader from "@/components/LojaHeader";
 import CarrinhoLateral from "@/components/CarrinhoLateral";
@@ -24,6 +24,8 @@ export default function Home() {
   const [empresa, setEmpresa] = useState<Empresa | null>(null);
   const [carregando, setCarregando] = useState(true);
   const [produtoAberto, setProdutoAberto] = useState<Produto | null>(null);
+  const [temMaisCategorias, setTemMaisCategorias] = useState(false);
+  const categoriasRef = useRef<HTMLDivElement | null>(null);
   const { itens, adicionarItem, subtotal } = useCarrinho();
 
   const horarios = empresa?.configuracoes && typeof empresa.configuracoes === "object"
@@ -46,6 +48,19 @@ export default function Home() {
   const emBusca = termo.length > 0;
   const categoriasComProduto = categoriasDe(produtos);
 
+  useEffect(() => {
+    const el = categoriasRef.current;
+    if (!el) return;
+    const atualizar = () => setTemMaisCategorias(el.scrollLeft + el.clientWidth < el.scrollWidth - 4);
+    atualizar();
+    el.addEventListener("scroll", atualizar, { passive: true });
+    window.addEventListener("resize", atualizar);
+    return () => {
+      el.removeEventListener("scroll", atualizar);
+      window.removeEventListener("resize", atualizar);
+    };
+  }, [categoriasComProduto.length]);
+
   const produtosFiltrados = useMemo(() => {
     const filtrados = produtos.filter((p) => {
       if (emBusca) return p.nome.toLocaleLowerCase("pt-BR").includes(termo);
@@ -53,137 +68,43 @@ export default function Home() {
       if (categoriaAtiva === "promocoes") return ePromocao(p);
       return p.categoria === categoriaAtiva && (subcategoriaAtiva === null || p.subcategoria === subcategoriaAtiva);
     });
-
-    return [...filtrados].sort(
-      (a, b) => (a.ordem ?? 0) - (b.ordem ?? 0) || a.nome.localeCompare(b.nome, "pt-BR")
-    );
+    return [...filtrados].sort((a, b) => (a.ordem ?? 0) - (b.ordem ?? 0) || a.nome.localeCompare(b.nome, "pt-BR"));
   }, [produtos, categoriaAtiva, subcategoriaAtiva, termo, emBusca]);
 
   const subsDaCategoria = subcategoriasDe(produtos, categoriaAtiva);
-
-  function selecionarCategoria(c: CategoriaCatalogo) {
-    setCategoriaAtiva(c);
-    setSubcategoriaAtiva(null);
-    setBusca("");
-  }
-
-  function precoDe(p: Produto) {
-    const base = p.preco ?? 0;
-    return ePromocao(p) ? p.precoPromocional! : base;
-  }
+  function selecionarCategoria(c: CategoriaCatalogo) { setCategoriaAtiva(c); setSubcategoriaAtiva(null); setBusca(""); }
+  function precoDe(p: Produto) { const base = p.preco ?? 0; return ePromocao(p) ? p.precoPromocional! : base; }
+  function rolarCategorias() { categoriasRef.current?.scrollBy({ left: Math.max(180, categoriasRef.current.clientWidth * 0.7), behavior: "smooth" }); }
 
   return (
     <main className="pb-24 lg:pb-8">
       <LojaHeader busca={busca} onBusca={setBusca} quantidadeCarrinho={itens.length} />
       <div className="mx-auto flex max-w-6xl gap-6 px-4 md:px-6">
-        <Sidebar
-          produtos={produtos}
-          categoriaAtiva={categoriaAtiva}
-          subcategoriaAtiva={subcategoriaAtiva}
-          onSelecionarCategoria={selecionarCategoria}
-          onSelecionarSubcategoria={setSubcategoriaAtiva}
-        />
+        <Sidebar produtos={produtos} categoriaAtiva={categoriaAtiva} subcategoriaAtiva={subcategoriaAtiva} onSelecionarCategoria={selecionarCategoria} onSelecionarSubcategoria={setSubcategoriaAtiva} />
         <div className="min-w-0 flex-1">
-          <nav className="sticky top-0 z-10 -mx-4 flex min-w-0 gap-2 overflow-x-auto bg-neutral-50 px-4 py-3 lg:hidden">
-            {categoriasComProduto.map((c) => (
-              <button
-                key={c.id}
-                onClick={() => selecionarCategoria(c.id)}
-                className={`shrink-0 whitespace-nowrap rounded-full px-3 py-1.5 text-sm ${
-                  categoriaAtiva === c.id && !emBusca
-                    ? "bg-brand-600 text-white"
-                    : "border border-neutral-200 bg-white text-neutral-600"
-                }`}
-              >
-                {c.label}
-              </button>
-            ))}
-          </nav>
-
-          {subsDaCategoria.length > 0 && !emBusca && (
-            <div className="-mx-4 mb-2 flex min-w-0 gap-2 overflow-x-auto px-4 pb-1 lg:hidden">
-              <button
-                onClick={() => setSubcategoriaAtiva(null)}
-                className={`shrink-0 whitespace-nowrap rounded-full px-3 py-1.5 text-xs ${
-                  subcategoriaAtiva === null ? "bg-brand-50 font-medium text-brand-700" : "text-neutral-500"
-                }`}
-              >
-                Todos
-              </button>
-              {subsDaCategoria.map((s) => (
-                <button
-                  key={s}
-                  onClick={() => setSubcategoriaAtiva(s)}
-                  className={`shrink-0 whitespace-nowrap rounded-full px-3 py-1.5 text-xs ${
-                    subcategoriaAtiva === s ? "bg-brand-50 font-medium text-brand-700" : "text-neutral-500"
-                  }`}
-                >
-                  {s}
-                </button>
-              ))}
+          <div className="sticky top-0 z-10 -mx-4 bg-neutral-50 px-4 pb-2 pt-3 lg:hidden">
+            <h2 className="mb-2 text-sm font-bold text-neutral-800">Categorias</h2>
+            <div className="relative">
+              <div ref={categoriasRef} className="flex min-w-0 gap-2 overflow-x-auto pr-12 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                {categoriasComProduto.map((c) => (
+                  <button key={c.id} onClick={() => selecionarCategoria(c.id)} className={`shrink-0 whitespace-nowrap rounded-full px-3 py-1.5 text-sm ${categoriaAtiva === c.id && !emBusca ? "bg-brand-600 text-white" : "border border-neutral-200 bg-white text-neutral-600"}`}>{c.label}</button>
+                ))}
+              </div>
+              {temMaisCategorias && <div className="pointer-events-none absolute inset-y-0 right-0 flex w-14 items-center justify-end bg-gradient-to-l from-neutral-50 via-neutral-50/95 to-transparent"><button type="button" onClick={rolarCategorias} aria-label="Ver mais categorias" title="Ver mais categorias" className="pointer-events-auto flex h-8 w-8 items-center justify-center rounded-full border border-neutral-200 bg-white text-lg font-bold text-brand-700 shadow-sm">›</button></div>}
             </div>
-          )}
+          </div>
 
-          {emBusca && (
-            <p className="mb-3 text-sm text-neutral-500">
-              Resultados para <strong className="text-neutral-800">“{busca}”</strong>
-            </p>
-          )}
+          {subsDaCategoria.length > 0 && !emBusca && <div className="-mx-4 mb-2 flex min-w-0 gap-2 overflow-x-auto px-4 pb-1 lg:hidden"><button onClick={() => setSubcategoriaAtiva(null)} className={`shrink-0 whitespace-nowrap rounded-full px-3 py-1.5 text-xs ${subcategoriaAtiva === null ? "bg-brand-50 font-medium text-brand-700" : "text-neutral-500"}`}>Todos</button>{subsDaCategoria.map((s) => <button key={s} onClick={() => setSubcategoriaAtiva(s)} className={`shrink-0 whitespace-nowrap rounded-full px-3 py-1.5 text-xs ${subcategoriaAtiva === s ? "bg-brand-50 font-medium text-brand-700" : "text-neutral-500"}`}>{s}</button>)}</div>}
+          {emBusca && <p className="mb-3 text-sm text-neutral-500">Resultados para <strong className="text-neutral-800">“{busca}”</strong></p>}
           {carregando && <p className="py-6 text-center text-sm text-neutral-400">Carregando cardápio...</p>}
-          {!carregando && produtosFiltrados.length === 0 && (
-            <p className="rounded-xl bg-white p-6 text-center text-sm text-neutral-500">Nenhum produto encontrado.</p>
-          )}
-
-          <section className="grid grid-cols-1 md:grid-cols-2 md:gap-4 lg:grid-cols-3">
-            {produtosFiltrados.map((produto) => (
-              <ProdutoCard
-                key={produto.id}
-                produto={produto}
-                aberta={aberta}
-                onAbrirDetalhes={() => setProdutoAberto(produto)}
-                onAdicionarRapido={() =>
-                  adicionarItem({
-                    produtoId: produto.id,
-                    nome: produto.nome,
-                    variacaoId: "unico",
-                    variacaoNome: "Unidade",
-                    adicionais: [],
-                    quantidade: 1,
-                    precoUnitario: precoDe(produto),
-                  })
-                }
-              />
-            ))}
-          </section>
-
-          {!carregando && !aberta && empresa && (
-            <p className="mx-4 mt-4 rounded-lg bg-red-50 p-3 text-center text-sm text-red-700 md:mx-0">
-              Estamos fechados no momento. Confira nosso horário de funcionamento.
-            </p>
-          )}
+          {!carregando && produtosFiltrados.length === 0 && <p className="rounded-xl bg-white p-6 text-center text-sm text-neutral-500">Nenhum produto encontrado.</p>}
+          <section className="grid grid-cols-1 md:grid-cols-2 md:gap-4 lg:grid-cols-3">{produtosFiltrados.map((produto) => <ProdutoCard key={produto.id} produto={produto} aberta={aberta} onAbrirDetalhes={() => setProdutoAberto(produto)} onAdicionarRapido={() => adicionarItem({ produtoId: produto.id, nome: produto.nome, variacaoId: "unico", variacaoNome: "Unidade", adicionais: [], quantidade: 1, precoUnitario: precoDe(produto) })} />)}</section>
+          {!carregando && !aberta && empresa && <p className="mx-4 mt-4 rounded-lg bg-red-50 p-3 text-center text-sm text-red-700 md:mx-0">Estamos fechados no momento. Confira nosso horário de funcionamento.</p>}
         </div>
         <CarrinhoLateral />
       </div>
-
-      {produtoAberto && (
-        <ProdutoModal
-          produto={produtoAberto}
-          aberta={aberta}
-          onClose={() => setProdutoAberto(null)}
-          onAdicionar={(payload) =>
-            adicionarItem({ produtoId: produtoAberto.id, nome: produtoAberto.nome, ...payload })
-          }
-        />
-      )}
-
-      {itens.length > 0 && (
-        <Link
-          href="/carrinho"
-          className="fixed bottom-0 left-0 right-0 bg-brand-700 py-3 text-center text-sm font-medium text-white lg:hidden"
-        >
-          Ver carrinho · {itens.length} {itens.length === 1 ? "item" : "itens"} · R$ {subtotal.toFixed(2)}
-        </Link>
-      )}
+      {produtoAberto && <ProdutoModal produto={produtoAberto} aberta={aberta} onClose={() => setProdutoAberto(null)} onAdicionar={(payload) => adicionarItem({ produtoId: produtoAberto.id, nome: produtoAberto.nome, ...payload })} />}
+      {itens.length > 0 && <Link href="/carrinho" className="fixed bottom-0 left-0 right-0 bg-brand-700 py-3 text-center text-sm font-medium text-white lg:hidden">Ver carrinho · {itens.length} {itens.length === 1 ? "item" : "itens"} · R$ {subtotal.toFixed(2)}</Link>}
     </main>
   );
 }
