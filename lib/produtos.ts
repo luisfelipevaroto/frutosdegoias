@@ -2,13 +2,13 @@ import { supabase } from "./supabase";
 import { Produto } from "./types";
 import { getEmpresaAtual } from "./empresa";
 
-export async function getProdutos(): Promise<Produto[]> {
-  const empresa = await getEmpresaAtual();
-  if (!empresa) return [];
+export async function getProdutos(empresaId?: string): Promise<Produto[]> {
+  const id = empresaId || (await getEmpresaAtual())?.id;
+  if (!id) return [];
   const { data, error } = await supabase
     .from("produtos")
     .select(`id, categoria, subcategoria, categoria_id, subcategoria_id, nome, descricao, foto_url, ativo, ordem, preco, preco_promocional, categorias ( nome, ordem ), subcategorias ( nome, ordem ), variacoes ( id, nome, preco ), produto_adicionais ( adicionais ( id, nome, preco ) )`)
-    .eq("empresa_id", empresa.id)
+    .eq("empresa_id", id)
     .eq("ativo", true)
     .order("ordem", { ascending: true })
     .order("nome", { ascending: true });
