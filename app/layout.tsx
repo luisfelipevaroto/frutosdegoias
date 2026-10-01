@@ -2,6 +2,7 @@ import "./globals.css";
 import { CarrinhoProvider } from "@/lib/carrinho-context";
 import BottomNav from "@/components/BottomNav";
 import Tracking from "@/components/Tracking";
+import FidelidadeBeneficio from "@/components/FidelidadeBeneficio";
 import { headers } from "next/headers";
 import { createClient } from "@supabase/supabase-js";
 import type { Metadata } from "next";
@@ -25,5 +26,5 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
-  return <html lang="pt-BR"><body className="bg-neutral-50 text-neutral-900"><Tracking/><CarrinhoProvider><div className="pb-16 md:pb-0">{children}</div><BottomNav /></CarrinhoProvider></body></html>;
+  return <html lang="pt-BR"><body className="bg-neutral-50 text-neutral-900"><Tracking/><CarrinhoProvider><div className="pb-16 md:pb-0">{children}</div><FidelidadeBeneficio/><BottomNav /></CarrinhoProvider></body></html>;
 }
