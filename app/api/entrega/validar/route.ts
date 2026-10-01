@@ -9,7 +9,7 @@ function km(aLat:number,aLon:number,bLat:number,bLon:number){
   return r*2*Math.atan2(Math.sqrt(x),Math.sqrt(1-x));
 }
 async function cepInfo(cep:string):Promise<Local|null>{
-  const r=await fetch(`https://brasilapi.com.br/api/cep/v2/${cep}`,{cache:"no-store"});
+  const r=await fetch(`https://brasilapi.com.br/api/cep/v2/${cep}`,{cache:"no-store",headers:{Accept:"application/json"}});
   if(!r.ok)return null; return r.json();
 }
 export async function POST(req:Request){
@@ -19,24 +19,37 @@ export async function POST(req:Request){
     const key=process.env.SUPABASE_SERVICE_ROLE_KEY;
     if(!key)return NextResponse.json({error:"Validação de entrega indisponível."},{status:503});
     const db=createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!,key);
-    const [{data:empresa},{data:cfg}]=await Promise.all([
+    const [{data:empresa},{data:cfg},{data:moduloIntegrado}]=await Promise.all([
       db.from("empresas").select("cep,endereco,cidade,estado").eq("id",empresaId).eq("ativo",true).single(),
-      db.from("configuracoes_loja").select("valor").eq("empresa_id",empresaId).eq("chave","entrega").maybeSingle()
+      db.from("configuracoes_loja").select("valor").eq("empresa_id",empresaId).eq("chave","entrega").maybeSingle(),
+      db.rpc("modulo_empresa_ativo",{p_empresa_id:empresaId,p_chave:"entrega_integrada"})
     ]);
     if(!empresa)return NextResponse.json({error:"Empresa não encontrada."},{status:404});
     const destino=await cepInfo(limpo);
     if(!destino)return NextResponse.json({error:"CEP não encontrado."},{status:404});
-    const raio=Number((cfg?.valor as any)?.raio_km||0);
+    const coord=destino.location?.coordinates;
+    const latitude=coord?.latitude?Number(coord.latitude):null,longitude=coord?.longitude?Number(coord.longitude):null;
+    const coordsValidas=Number.isFinite(latitude)&&Number.isFinite(longitude);
+    const entregaCfg=(cfg?.valor||{}) as any;
+    const usaIntegrada=moduloIntegrado===true&&Boolean(entregaCfg?.integrada)&&(Boolean(entregaCfg?.uber_direct)||Boolean(entregaCfg?.ifood)||Boolean(entregaCfg?.entrega_99));
+    if(usaIntegrada&&!coordsValidas)return NextResponse.json({error:"Não foi possível localizar este CEP no mapa. Confira o CEP ou informe outro endereço."},{status:422});
+    const raio=Number(entregaCfg?.raio_km||0);
     let distanciaKm:number|null=null,dentro=true;
-    if(raio>0){
+    if(Boolean(entregaCfg?.propria)&&raio>0){
       const origemCep=String(empresa.cep||"").replace(/\D/g,"");
       if(origemCep.length!==8)return NextResponse.json({error:"A loja precisa cadastrar um CEP de origem para validar o raio de entrega."},{status:422});
       const origem=await cepInfo(origemCep);
-      const a=origem?.location?.coordinates,b=destino.location?.coordinates;
-      if(!a?.latitude||!a?.longitude||!b?.latitude||!b?.longitude)return NextResponse.json({error:"Não foi possível calcular a distância deste CEP. Tente outro endereço ou fale com a loja."},{status:422});
-      distanciaKm=km(Number(a.latitude),Number(a.longitude),Number(b.latitude),Number(b.longitude));
+      const a=origem?.location?.coordinates;
+      if(!a?.latitude||!a?.longitude||!coordsValidas)return NextResponse.json({error:"Não foi possível calcular a distância deste CEP. Tente outro endereço ou fale com a loja."},{status:422});
+      distanciaKm=km(Number(a.latitude),Number(a.longitude),latitude as number,longitude as number);
       dentro=distanciaKm<=raio;
     }
-    return NextResponse.json({valido:dentro,raioKm:raio,distanciaKm:distanciaKm===null?null:Number(distanciaKm.toFixed(2)),endereco:{cep:destino.cep||limpo,logradouro:destino.street||"",bairro:destino.neighborhood||"",cidade:destino.city||"",estado:destino.state||""}});
+    return NextResponse.json({
+      valido:dentro,
+      raioKm:raio,
+      distanciaKm:distanciaKm===null?null:Number(distanciaKm.toFixed(2)),
+      endereco:{cep:destino.cep||limpo,logradouro:destino.street||"",bairro:destino.neighborhood||"",cidade:destino.city||"",estado:destino.state||"",latitude:coordsValidas?latitude:null,longitude:coordsValidas?longitude:null},
+      geolocalizacao:coordsValidas?{latitude,longitude}:null
+    });
   }catch{return NextResponse.json({error:"Não foi possível validar o endereço."},{status:400})}
 }
