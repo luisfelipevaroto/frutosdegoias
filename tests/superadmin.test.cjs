@@ -144,3 +144,32 @@ test('every route stops before database access when authorization is denied', as
   }
   assert.equal(reads, 3);
 });
+
+test('platform login checks Superadmin permission without resolving a tenant', async () => {
+  const login = load('lib/superadmin-login.ts');
+  const calls = [];
+  await login.entrarSuperadmin({
+    auth: { signInWithPassword: async input => { calls.push(input.email); return { data: { user: { id: 'u' } }, error: null }; }, signOut: async () => { throw new Error('unexpected signout'); } },
+    rpc: async name => { calls.push(name); return { data: true, error: null }; },
+    from: () => { throw new Error('tenant lookup must not occur'); },
+  }, ' user@example.com ', 'test-password');
+  assert.deepEqual(calls, ['user@example.com', 'is_super_admin']);
+});
+test('platform login revokes local session on permission denial or permission lookup failure', async () => {
+  const login = load('lib/superadmin-login.ts');
+  for (const permission of [{ data: false, error: null }, { data: null, error: { message: 'failure' } }]) {
+    let signedOut = 0;
+    await assert.rejects(login.entrarSuperadmin({
+      auth: { signInWithPassword: async () => ({ data: { user: { id: 'u' } }, error: null }), signOut: async options => { assert.equal(options.scope, 'local'); signedOut++; return { error: null }; } },
+      rpc: async () => permission,
+    }, 'user@example.com', 'test-password'), /permissão|acesso/);
+    assert.equal(signedOut, 1);
+  }
+});
+test('invalid platform credentials never reach the permission check', async () => {
+  const login = load('lib/superadmin-login.ts');
+  await assert.rejects(login.entrarSuperadmin({
+    auth: { signInWithPassword: async () => ({ data: { user: null }, error: { message: 'invalid' } }) },
+    rpc: () => { throw new Error('must not check permission'); },
+  }, 'user@example.com', 'wrong-password'), /inválidos/);
+});

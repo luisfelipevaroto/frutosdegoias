@@ -2,6 +2,12 @@
 
 ## Entrega
 
+O acesso da plataforma usa `/superadmin/login`, que autentica no Supabase e
+verifica `is_super_admin` sem depender de `empresa_por_dominio` ou `admin_users`.
+O login de lojas continua em `/admin/login` e exige domínio cadastrado. Isso
+permite testar o Superadmin em URLs temporárias do preview sem cadastrar cada
+domínio e sem liberar acesso administrativo de lojas a usuários comuns.
+
 `/superadmin` passa a ter dashboard global e gestão de empresas com busca por
 nome, slug ou domínio, filtros por situação e plano, cadastro e edição de dados
 básicos. O botão de painel abre o domínio da empresa e exige o login dela;

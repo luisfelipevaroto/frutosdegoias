@@ -30,13 +30,13 @@ export default function SuperAdmin() {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (request !== requestId.current) return;
-      if (!session) { setDados(null); router.replace("/admin/login"); return; }
+      if (!session) { setDados(null); router.replace("/superadmin/login"); return; }
       const res = await fetch("/api/superadmin", { headers: { Authorization: `Bearer ${session.access_token}` }, cache: "no-store" });
       const payload = await res.json();
       if (request !== requestId.current) return;
       if (!res.ok) {
         if (res.status === 401 || res.status === 403) setDados(null);
-        if (res.status === 401) router.replace("/admin/login");
+        if (res.status === 401) router.replace("/superadmin/login");
         throw new Error(payload.error || "Não foi possível carregar o painel.");
       }
       setDados(payload);
@@ -47,7 +47,7 @@ export default function SuperAdmin() {
   async function sair() {
     const { error } = await supabase.auth.signOut();
     if (error) { setErro("Não foi possível sair. Tente novamente."); return; }
-    requestId.current++; setDados(null); router.replace("/admin/login");
+    requestId.current++; setDados(null); router.replace("/superadmin/login");
   }
   function editar(e: EmpresaSuperadmin | "nova") { setEditando(e); setForm(e === "nova" ? { ...vazio } : formEmpresa(e)); setErro(""); setSucesso(""); }
   async function salvarEmpresa(event: FormEvent) {
@@ -56,7 +56,7 @@ export default function SuperAdmin() {
     mutation.current = true; setSalvando(true); setErro(""); setSucesso("");
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) { router.replace("/admin/login"); throw new Error("Sessão expirada."); }
+      if (!session) { router.replace("/superadmin/login"); throw new Error("Sessão expirada."); }
       const res = await fetch("/api/superadmin", { method: editando === "nova" ? "POST" : "PATCH", headers: { Authorization: `Bearer ${session.access_token}`, "Content-Type": "application/json" }, body: JSON.stringify({ ...form, ...(editando === "nova" ? {} : { id: editando.id, atualizado_em: editando.atualizado_em }) }) });
       const result = await res.json();
       if (!res.ok) throw new Error(result.error || "Não foi possível salvar.");
@@ -78,7 +78,7 @@ export default function SuperAdmin() {
     finally { mutation.current = false; setSalvandoModulo(""); }
   }
 
-  if (!dados) return <main className="flex min-h-screen items-center justify-center bg-neutral-100 p-6"><div className="w-full max-w-md rounded-2xl border bg-white p-8 shadow-sm"><p className="text-xs font-bold uppercase tracking-widest text-brand-700">Plataforma delivery</p><h1 className="mt-2 text-2xl font-bold">Superadmin 2.0</h1>{carregando ? <p className="mt-4 text-neutral-500" role="status">Carregando seu painel…</p> : <><p role="alert" className="mt-4 text-sm text-red-700">{erro || "Entre para acessar o painel."}</p><button onClick={carregar} className="mt-5 rounded-xl border px-4 py-2 text-sm">Tentar novamente</button><button onClick={() => router.push("/admin/login")} className="ml-2 rounded-xl bg-brand-700 px-4 py-2 text-sm text-white">Entrar</button></>}</div></main>;
+  if (!dados) return <main className="flex min-h-screen items-center justify-center bg-neutral-100 p-6"><div className="w-full max-w-md rounded-2xl border bg-white p-8 shadow-sm"><p className="text-xs font-bold uppercase tracking-widest text-brand-700">Plataforma delivery</p><h1 className="mt-2 text-2xl font-bold">Superadmin 2.0</h1>{carregando ? <p className="mt-4 text-neutral-500" role="status">Carregando seu painel…</p> : <><p role="alert" className="mt-4 text-sm text-red-700">{erro || "Entre para acessar o painel."}</p><button onClick={carregar} className="mt-5 rounded-xl border px-4 py-2 text-sm">Tentar novamente</button><button onClick={() => router.push("/superadmin/login")} className="ml-2 rounded-xl bg-brand-700 px-4 py-2 text-sm text-white">Entrar</button></>}</div></main>;
   const selecionada = dados.empresas.find(e => e.id === selecionadaId) || null;
   const filtradas = dados.empresas.filter(e => `${e.nome} ${e.slug} ${e.dominio_principal || ""}`.toLocaleLowerCase("pt-BR").includes(busca.toLocaleLowerCase("pt-BR")) && (filtro === "todas" || (filtro === "ativas" ? e.ativo : !e.ativo)) && (planoFiltro === "todos" || (planoFiltro === "sem-plano" ? !e.plano_id : e.plano_id === planoFiltro)));
   const mesTexto = new Date(`${dados.mes}-15T12:00:00Z`).toLocaleDateString("pt-BR", { month: "long", year: "numeric", timeZone: "America/Sao_Paulo" });

@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { Empresa, getEmpresaAtual } from "@/lib/empresa";
 
@@ -38,6 +39,7 @@ export default function AdminLogin() {
       <input required type="password" value={senha} onChange={e=>setSenha(e.target.value)} className="w-full rounded-lg border p-3 mb-4" />
       {erro && <p className="text-sm text-red-600 mb-3">{erro}</p>}
       <button disabled={loading} style={{backgroundColor:primaria}} className="w-full rounded-lg text-white py-3 disabled:opacity-50">{loading ? "Entrando..." : "Entrar"}</button>
+      <Link href="/superadmin/login" className="mt-5 block text-center text-xs text-neutral-500">Acesso ao Superadmin da plataforma</Link>
     </form>
   </main>;
 }
