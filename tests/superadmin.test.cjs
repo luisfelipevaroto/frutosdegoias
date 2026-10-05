@@ -17,6 +17,18 @@ function load(file, mocks = {}) {
   return module.exports;
 }
 const core = load('lib/superadmin.ts');
+const adicionais = load('lib/adicionais.ts');
+test('free toppings cover most expensive choices independent of selection order',()=>{
+  const items=[{id:'a',preco:1},{id:'b',preco:4},{id:'c',preco:3},{id:'d',preco:2}];
+  const result=adicionais.calcularAdicionais(items,3);assert.equal(result.total,1);assert.equal(result.gratis.has('a'),false);
+  assert.equal(adicionais.calcularAdicionais([...items].reverse(),3).total,1);assert.equal(adicionais.calcularAdicionais(items.slice(0,3),3).total,0);
+  assert.equal(adicionais.calcularAdicionais(items,0).total,10);assert.equal(result.total*2,2);assert.equal(items[1].preco,4);
+});
+test('free topping prices handle cents, ties, empty selections and duplicate ids',()=>{
+  assert.equal(adicionais.calcularAdicionais([{id:'b',preco:.20},{id:'a',preco:.20},{id:'c',preco:.10}],1).total,.30);
+  assert.equal(adicionais.calcularAdicionais([{id:'b',preco:2},{id:'a',preco:2}],1).gratis.has('a'),true);
+  assert.equal(adicionais.calcularAdicionais([],3).total,0);assert.equal(adicionais.calcularAdicionais([{id:'a',preco:2},{id:'a',preco:2}],0).total,2);
+});
 const produtosAdmin = load('lib/produtos-admin.ts');
 test('product pages fetch twenty items with tenant scope and stable order',async()=>{
   const calls=[];const source=Array.from({length:47},(_,i)=>({id:String(i),nome:`Produto ${i}`,variacoes:[],produto_adicionais:[]}));
