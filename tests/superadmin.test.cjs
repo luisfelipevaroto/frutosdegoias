@@ -17,6 +17,21 @@ function load(file, mocks = {}) {
   return module.exports;
 }
 const core = load('lib/superadmin.ts');
+const produtosAdmin = load('lib/produtos-admin.ts');
+test('product pages fetch twenty items with tenant scope and stable order',async()=>{
+  const calls=[];const source=Array.from({length:47},(_,i)=>({id:String(i),nome:`Produto ${i}`,variacoes:[],produto_adicionais:[]}));
+  const query={select:(fields,options)=>{assert.equal(options.count,'exact');assert.ok(fields.includes('variacoes'));return query;},eq:(key,value)=>{calls.push([key,value]);return query;},order:key=>{calls.push(['order',key]);return query;},range:async(from,to)=>({data:source.slice(from,to+1),count:source.length,error:null})};
+  const db={from:table=>{assert.equal(table,'produtos');return query;}};
+  const first=await produtosAdmin.buscarProdutosAdmin(db,'tenant','',0),next=await produtosAdmin.buscarProdutosAdmin(db,'tenant','',20),last=await produtosAdmin.buscarProdutosAdmin(db,'tenant','',40);
+  assert.equal(first.produtos.length,20);assert.equal(next.produtos[0].id,'20');assert.equal(last.produtos.length,7);assert.equal(first.total,47);
+  assert.deepEqual(calls.slice(0,4),[['empresa_id','tenant'],['order','categoria'],['order','nome'],['order','id']]);
+});
+test('product search runs in the database, escapes wildcard input and surfaces failures',async()=>{
+  let pattern;const query={select:()=>query,eq:()=>query,ilike:(column,value)=>{assert.equal(column,'nome');pattern=value;return query;},order:()=>query,range:async()=>({data:[{id:'beyond-first-page'}],count:1,error:null})};
+  assert.equal((await produtosAdmin.buscarProdutosAdmin({from:()=>query},'tenant','  Sorvete  ',0)).produtos[0].id,'beyond-first-page');assert.equal(pattern,'%Sorvete%');
+  await produtosAdmin.buscarProdutosAdmin({from:()=>query},'tenant','50%_\\',0);assert.equal(pattern,'%50\\%\\_\\\\%');
+  query.range=async()=>({data:null,error:{message:'failure'}});await assert.rejects(produtosAdmin.buscarProdutosAdmin({from:()=>query},'tenant','',0),/carregar os produtos/);
+});
 const comercial = load('lib/superadmin-comercial.ts');
 const uuid='11111111-1111-4111-8111-111111111111';
 const subscription={acao:'salvar_assinatura',empresa_id:uuid,plano_id:uuid,plano_versao:1,valor_mensal:29.90,status:'trial',inicio:'2026-10-05',fim_teste:'2026-10-12',vencimento:'',notas:'',versao:0};
