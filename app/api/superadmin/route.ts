@@ -62,3 +62,4 @@ async function salvar(req: Request, criar: boolean) {
 }
 export async function POST(req: Request) { return salvar(req, true); }
 export async function PATCH(req: Request) { return salvar(req, false); }
+

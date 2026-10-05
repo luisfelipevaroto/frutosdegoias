@@ -17,6 +17,29 @@ function load(file, mocks = {}) {
   return module.exports;
 }
 const core = load('lib/superadmin.ts');
+const comercial = load('lib/superadmin-comercial.ts');
+const uuid='11111111-1111-4111-8111-111111111111';
+const subscription={acao:'salvar_assinatura',empresa_id:uuid,plano_id:uuid,plano_versao:1,valor_mensal:29.90,status:'trial',inicio:'2026-10-05',fim_teste:'2026-10-12',vencimento:'',notas:'',versao:0};
+test('commercial inputs reject invalid dates, money and forged actor; preserve cents',()=>{
+  const clean=comercial.validarComercial({...subscription,autor:'forged'});
+  assert.equal(clean.dados.valor_mensal,29.90);assert.equal(clean.dados.autor,undefined);
+  for(const change of [{valor_mensal:29.999},{valor_mensal:NaN},{fim_teste:'2026-02-30'},{fim_teste:'2026-10-04'},{status:'ativa'},{status:'toString'},{plano_versao:-1}])assert.throws(()=>comercial.validarComercial({...subscription,...change}));
+  assert.equal(comercial.somarDias('2026-12-28',7),'2027-01-04');
+});
+test('subscription totals distinguish contracted active revenue from trials and cancellations',()=>{
+  const summary=comercial.resumoAssinaturas([{...subscription,status:'ativa',valor_mensal:49.90,vencimento:'2026-10-04'},{...subscription,status:'ativa',valor_mensal:29.90,vencimento:'2026-10-06'},{...subscription,status:'trial',valor_mensal:99.90},{...subscription,status:'cancelada',valor_mensal:99.90},{...subscription,status:'atrasada',valor_mensal:99.90}],'2026-10-05');
+  assert.equal(summary.mrr,79.8);assert.equal(summary.ativas,2);assert.equal(summary.testes,1);assert.equal(summary.pendencias,2);
+});
+test('commercial routes deny access before parsing input or reading private records',async()=>{
+  const route=load('app/api/superadmin/comercial/route.ts',{'next/server':next,'@/lib/superadmin-comercial':comercial,'@/lib/superadmin-server':{autorizarSuperadmin:async()=>NextResponse.json({}, {status:403}),resposta:(data,status=200)=>NextResponse.json(data,{status})}});
+  for(const method of ['GET','POST'])assert.equal((await route[method](new Request('http://localhost',{method}))).status,403);
+});
+test('commercial writes use verified actor and report stale versions as conflicts',async()=>{
+  let args;
+  const route=load('app/api/superadmin/comercial/route.ts',{'next/server':next,'@/lib/superadmin-comercial':comercial,'@/lib/superadmin-server':{autorizarSuperadmin:async()=>({userId:'verified',db:{rpc:async(name,input)=>{args=input;assert.equal(name,'superadmin_salvar_comercial');return{error:{code:'40001',message:'Atualize o painel'}};}}}),resposta:(data,status=200)=>NextResponse.json(data,{status})}});
+  const res=await route.POST(new Request('http://localhost',{method:'POST',body:JSON.stringify({...subscription,p_autor:'forged'})}));
+  assert.equal(res.status,409);assert.equal(args.p_autor,'verified');assert.equal(args.p_dados.p_autor,undefined);
+});
 class NextResponse {
   constructor(data, options) { this.data = data; this.status = options.status; this.headers = options.headers; }
   static json(data, options) { return new NextResponse(data, options); }
@@ -173,3 +196,4 @@ test('invalid platform credentials never reach the permission check', async () =
     rpc: () => { throw new Error('must not check permission'); },
   }, 'user@example.com', 'wrong-password'), /inválidos/);
 });
+

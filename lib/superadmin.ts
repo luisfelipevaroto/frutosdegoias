@@ -68,3 +68,4 @@ export function validarEmpresa(input: unknown) {
     whatsapp: texto("whatsapp", 30) || null, endereco: texto("endereco", 300) || null,
     cidade: texto("cidade", 100) || null, estado: estado || null, cep: texto("cep", 12) || null };
 }
+

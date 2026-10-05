@@ -33,3 +33,4 @@ export async function paginar<T>(buscar: (inicio: number, fim: number) => Promis
     inicio += result.data.length;
   }
 }
+

@@ -90,15 +90,51 @@ bloqueada pela política automática de execução do ambiente.
 6. Conferir ambiente das integrações e ausência de valores de credenciais nas
    respostas da API e no navegador.
 
+## Planos e assinaturas
+
+Catálogo: Básico R$ 29,90 (cardápio visual), Médio R$ 49,90 (pedidos,
+entrega própria, fidelidade e pagamento online), Avançado R$ 99,90 (todos os
+módulos ativos do catálogo atual). Os três oferecem 7 dias de teste. Base foi
+preservado sem preço definido e sem mudança nas duas empresas existentes.
+
+As abas Planos e Assinaturas permitem cadastro e edição. A assinatura guarda
+o nome e preço contratado, datas, observação, status manual e histórico.
+Nenhuma cobrança, renovação ou suspensão automática foi implementada.
+Alterar preço do plano não reajusta os contratos. Cancelamento comercial
+não desativa a empresa nem remove seu plano; revise recursos separadamente.
+Exceções da empresa têm prioridade; “Usar regra do plano” remove a exceção
+somente se não contiver configurações próprias.
+
+A migration `superadmin_planos_assinaturas` foi aplicada via Supabase MCP
+com o conteúdo de supabase/superadmin-comercial.sql e tests/comercial-db.sql.
+Não reaplicar: ALTERs e criação de tabelas são para instalação única.
+Os testes de banco usam empresa/plano sintéticos numa subtransação revertida;
+confirmam conflito de versão, rollback, datas, preços preservados e bloqueio
+de pedidos no cardápio visual. Nenhuma assinatura real foi atribuída.
+
+As novas tabelas têm RLS e nenhuma permissão pública. Somente a API do
+Superadmin usa service_role depois de validar o usuário e is_super_admin.
+O aviso informativo de RLS sem políticas nessas tabelas é intencional.
+Os avisos sobre funções SECURITY DEFINER já existentes devem ser avaliados
+em auditoria própria: https://supabase.com/docs/guides/database/database-linter?lint=0028_anon_security_definer_function_executable
+Esta etapa acrescenta a checagem de pedidos à função existente sem alterar
+suas permissões. Não constitui auditoria completa dos endpoints de loja.
+
+Validação comercial: 17 testes de aplicação, build e testes SQL aprovados.
+No preview, abrir Planos para conferir preços/recursos e Assinaturas para
+cadastrar um contrato apenas numa empresa de teste. Conferir conflito com
+duas sessões, datas e histórico; validar pedido de loja Básica e relatório
+de loja Avançada. O dashboard da loja respeita relatorios; o cardápio visual
+esconde carrinho/checkout e o banco rejeita pedidos de empresas sem pedidos.
+
 ## Sequência restante
 
-1. Planos: gestão do catálogo e composição de módulos, atribuição a empresas,
-   retorno à herança do plano e avaliação das exceções já existentes.
-2. Assinaturas: modelagem de preço, período de teste, vencimento, estados e
-   histórico; controle manual antes de cobrança recorrente.
+1. Cobrança recorrente: escolha do provedor e política de renovação,
+   inadimplência, suspensão e migração dos contratos existentes.
 3. Saúde das integrações: última comunicação, eventos e erros sanitizados;
    diferenciar cadastro de credenciais de verificação real de conexão.
 4. Impersonação com auditoria e revisão de permissões antes de liberar acesso.
 
-Essas etapas não foram implementadas neste PR. Publicação em produção depende
+As etapas restantes não foram implementadas neste PR. Publicação em produção depende
 da revisão e validação do preview; este PR não altera credenciais de provedores.
+

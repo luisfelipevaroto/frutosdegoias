@@ -24,3 +24,4 @@ export default function Dashboard({ dados, abrirEmpresa }: { dados: DashboardSup
 function Metrica({ titulo, valor, detalhe, destaque = false }: { titulo: string; valor: string; detalhe: string; destaque?: boolean }) {
   return <section className={`rounded-2xl border p-5 ${destaque ? "border-emerald-100 bg-[#eaf3ee]" : "bg-white"}`}><h3 className="text-sm text-neutral-600">{titulo}</h3><p className="mt-3 text-3xl font-bold tracking-tight">{valor}</p><p className="mt-3 text-xs leading-relaxed text-neutral-500">{detalhe}</p></section>;
 }
+

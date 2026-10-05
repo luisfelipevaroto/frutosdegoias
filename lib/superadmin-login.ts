@@ -14,3 +14,4 @@ export async function entrarSuperadmin(client: SupabaseClient, email: string, se
     if (!permitido) await client.auth.signOut({ scope: "local" });
   }
 }
+
