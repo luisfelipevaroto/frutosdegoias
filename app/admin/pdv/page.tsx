@@ -6,9 +6,12 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { getEmpresaAdminAtual } from "@/lib/empresa-admin";
 
+import EscolhaGrupos from "@/components/EscolhaGrupos";
+import { GrupoAdicionais, validarSelecaoGrupos } from "@/lib/grupos-adicionais";
+
 type Variacao = { id: string; nome: string; preco: number };
 type Adicional = { id: string; nome: string; preco: number };
-type Produto = { id: string; nome: string; preco: number | null; preco_promocional: number | null; foto_url?: string | null; categoria?: string | null; variacoes: Variacao[]; adicionais: Adicional[] };
+type Produto = { id: string; nome: string; preco: number | null; preco_promocional: number | null; foto_url?: string | null; categoria?: string | null; variacoes: Variacao[]; adicionais: Adicional[]; grupos: GrupoAdicionais[] };
 type Item = { chave: string; produto_id: string; nome: string; variacao_id: string | null; variacao_nome?: string; adicionais: Adicional[]; quantidade: number; preco_base: number };
 type Cliente = { id: string; nome: string; cpf: string; telefone: string; whatsapp?: string };
 type EntregaCfg = { propria?: boolean; retirada?: boolean; taxa?: number; pedido_minimo?: number };
@@ -53,15 +56,12 @@ export default function PDV() {
       const e = await getEmpresaAdminAtual(user.id);
       if (!e) return setErro("Sem acesso a esta empresa.");
       setEmpresaId(e.id); setEmpresaNome(e.nome);
-      const [pr, pa, ads, cfg] = await Promise.all([
-        supabase.from("produtos").select("id,nome,preco,preco_promocional,foto_url,categoria,variacoes(id,nome,preco)").eq("empresa_id", e.id).eq("ativo", true).order("ordem").order("nome"),
-        supabase.from("produto_adicionais").select("produto_id,adicional_id"),
-        supabase.from("adicionais").select("id,nome,preco").eq("empresa_id", e.id).order("nome"),
+      const [pr, cfg] = await Promise.all([
+        supabase.rpc("catalogo_publico", {p_empresa_id:e.id}),
         supabase.from("configuracoes_loja").select("chave,valor").eq("empresa_id", e.id).in("chave", ["entrega", "pagamentos"]),
       ]);
       if (pr.error) return setErro(pr.error.message);
-      const rel = pa.data ?? [], adicionais = (ads.data ?? []) as Adicional[];
-      setProdutos((pr.data ?? []).map((p: any) => ({ ...p, adicionais: adicionais.filter((a) => rel.some((r: any) => r.produto_id === p.id && r.adicional_id === a.id)) })) as Produto[]);
+      setProdutos((pr.data ?? []).map((p: any) => ({ ...p, adicionais: p.adicionais??[], grupos:p.grupos_adicionais??[] })) as Produto[]);
       const ec = (cfg.data?.find((x: any) => x.chave === "entrega")?.valor ?? { retirada: true }) as EntregaCfg;
       const pc = (cfg.data?.find((x: any) => x.chave === "pagamentos")?.valor ?? { dinheiro: true, cartao_entrega: true, pix_manual: true }) as PagamentoCfg;
       setEntregaCfg(ec); setPagamentoCfg(pc);
@@ -91,6 +91,7 @@ export default function PDV() {
   }, [cliente?.id]);
 
   const categorias = useMemo(() => ["todos", ...Array.from(new Set(produtos.map((p) => p.categoria).filter(Boolean) as string[]))], [produtos]);
+  const pendenciaGrupo=produtoModal?validarSelecaoGrupos(produtoModal.grupos,adicionaisModal):"";
   const lista = produtos.filter((p) => (categoria === "todos" || p.categoria === categoria) && p.nome.toLocaleLowerCase("pt-BR").includes(busca.toLocaleLowerCase("pt-BR")));
   const subtotal = useMemo(() => itens.reduce((s, i) => s + (i.preco_base + i.adicionais.reduce((a, x) => a + Number(x.preco), 0)) * i.quantidade, 0), [itens]);
   const total = subtotal + (tipo === "entrega" ? Number(taxa || 0) : 0);
@@ -101,7 +102,7 @@ export default function PDV() {
   function abrirProduto(p: Produto) { setProdutoModal(p); setVariacaoModal(p.variacoes?.length === 1 ? p.variacoes[0] : null); setAdicionaisModal([]); }
   function alternarAdicional(a: Adicional) { setAdicionaisModal((xs) => xs.some((x) => x.id === a.id) ? xs.filter((x) => x.id !== a.id) : [...xs, a]); }
   function confirmarProduto() {
-    if (!produtoModal) return;
+    if (!produtoModal||pendenciaGrupo) return;
     if (produtoModal.variacoes?.length && !variacaoModal) return setErro("Selecione uma variação.");
     const preco = variacaoModal ? Number(variacaoModal.preco) : Number(produtoModal.preco_promocional ?? produtoModal.preco ?? 0);
     const ids = adicionaisModal.map((a) => a.id).sort().join("-");
@@ -156,6 +157,6 @@ export default function PDV() {
         <div className="mt-3 text-sm"><div className="flex justify-between"><span>Subtotal</span><span>{brl(subtotal)}</span></div>{tipo === "entrega" && <div className="flex justify-between"><span>Entrega</span><span>{brl(Number(taxa || 0))}</span></div>}{cashbackAplicar > 0 && <div className="flex justify-between font-medium text-green-700"><span>Cashback</span><span>− {brl(cashbackAplicar)}</span></div>}<div className="mt-2 flex justify-between border-t pt-2 text-lg font-bold"><span>Total</span><span>{brl(totalPrevisto)}</span></div></div>
         <button disabled={salvando || !itens.length} onClick={finalizar} className="mt-3 w-full rounded-lg bg-brand-700 p-3 font-semibold text-white disabled:opacity-40">{salvando ? "Criando pedido..." : "Criar pedido"}</button>
       </section></aside></div>
-    {produtoModal && <div className="fixed inset-0 z-50 flex items-end justify-center overflow-y-auto bg-black/40 p-2 sm:items-center sm:p-4" onClick={() => setProdutoModal(null)}><div className="flex max-h-[calc(100dvh-1rem)] w-full max-w-md flex-col overflow-hidden rounded-2xl bg-white sm:max-h-[90vh]" onClick={(e) => e.stopPropagation()}><div className="shrink-0 border-b p-4 sm:p-5"><div className="flex justify-between gap-3"><div className="min-w-0"><h2 className="truncate text-lg font-bold">{produtoModal.nome}</h2><p className="text-xs text-neutral-500">Configure o item</p></div><button onClick={() => setProdutoModal(null)} className="shrink-0 text-xl">×</button></div></div><div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-5">{produtoModal.variacoes?.length > 0 && <div><p className="mb-2 text-sm font-semibold">Variação</p><div className="grid gap-2">{produtoModal.variacoes.map((v) => <button key={v.id} onClick={() => setVariacaoModal(v)} className={`flex justify-between gap-3 rounded-lg border p-3 text-sm ${variacaoModal?.id === v.id ? "border-brand-600 bg-brand-50" : ""}`}><span className="text-left">{v.nome}</span><b className="shrink-0">{brl(Number(v.preco))}</b></button>)}</div></div>}{produtoModal.adicionais.length > 0 && <div className="mt-4"><div className="mb-2 flex items-center justify-between gap-2"><p className="text-sm font-semibold">Adicionais</p><span className="text-xs text-neutral-400">{adicionaisModal.length} selecionado{adicionaisModal.length === 1 ? "" : "s"}</span></div><div className="grid max-h-[38vh] gap-2 overflow-y-auto overscroll-contain pr-1 sm:max-h-72">{produtoModal.adicionais.map((a) => <label key={a.id} className="flex cursor-pointer items-start justify-between gap-3 rounded-lg border p-3 text-sm"><span className="min-w-0"><input type="checkbox" checked={adicionaisModal.some((x) => x.id === a.id)} onChange={() => alternarAdicional(a)} className="mr-2" />{a.nome}</span><b className="shrink-0">+ {brl(Number(a.preco))}</b></label>)}</div></div>}</div><div className="shrink-0 border-t bg-white p-4 sm:p-5"><button onClick={confirmarProduto} className="w-full rounded-lg bg-brand-700 p-3 font-bold text-white">Adicionar ao pedido</button></div></div></div>}
+    {produtoModal && <div className="fixed inset-0 z-50 flex items-end justify-center overflow-y-auto bg-black/40 p-2 sm:items-center sm:p-4" onClick={() => setProdutoModal(null)}><div className="flex max-h-[calc(100dvh-1rem)] w-full max-w-md flex-col overflow-hidden rounded-2xl bg-white sm:max-h-[90vh]" onClick={(e) => e.stopPropagation()}><div className="shrink-0 border-b p-4 sm:p-5"><div className="flex justify-between gap-3"><div className="min-w-0"><h2 className="truncate text-lg font-bold">{produtoModal.nome}</h2><p className="text-xs text-neutral-500">Configure o item</p></div><button onClick={() => setProdutoModal(null)} className="shrink-0 text-xl">×</button></div></div><div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-5">{produtoModal.variacoes?.length > 0 && <div><p className="mb-2 text-sm font-semibold">Variação</p><div className="grid gap-2">{produtoModal.variacoes.map((v) => <button key={v.id} onClick={() => setVariacaoModal(v)} className={`flex justify-between gap-3 rounded-lg border p-3 text-sm ${variacaoModal?.id === v.id ? "border-brand-600 bg-brand-50" : ""}`}><span className="text-left">{v.nome}</span><b className="shrink-0">{brl(Number(v.preco))}</b></button>)}</div></div>}{produtoModal.grupos.length>0&&<div className="mt-4"><EscolhaGrupos grupos={produtoModal.grupos} selecionados={adicionaisModal} onChange={setAdicionaisModal}/></div>}{produtoModal.adicionais.length > 0 && <div className="mt-4"><div className="mb-2 flex items-center justify-between gap-2"><p className="text-sm font-semibold">Adicionais</p><span className="text-xs text-neutral-400">{adicionaisModal.length} selecionado{adicionaisModal.length === 1 ? "" : "s"}</span></div><div className="grid max-h-[38vh] gap-2 overflow-y-auto overscroll-contain pr-1 sm:max-h-72">{produtoModal.adicionais.map((a) => <label key={a.id} className="flex cursor-pointer items-start justify-between gap-3 rounded-lg border p-3 text-sm"><span className="min-w-0"><input type="checkbox" checked={adicionaisModal.some((x) => x.id === a.id)} onChange={() => alternarAdicional(a)} className="mr-2" />{a.nome}</span><b className="shrink-0">+ {brl(Number(a.preco))}</b></label>)}</div></div>}</div><div className="shrink-0 border-t bg-white p-4 sm:p-5">{pendenciaGrupo&&<p role="status" className="mb-2 text-xs text-neutral-600">{pendenciaGrupo}</p>}<button disabled={!!pendenciaGrupo||!!(produtoModal.variacoes.length&&!variacaoModal)} onClick={confirmarProduto} className="w-full rounded-lg bg-brand-700 p-3 font-bold text-white disabled:opacity-40">Adicionar ao pedido</button></div></div></div>}
   </div></main>;
 }

@@ -1,3 +1,4 @@
+import type { GrupoAdicionais } from "./grupos-adicionais";
 export type Categoria = string;
 
 export const ROTULOS_SUBCATEGORIA: Record<string, string> = {
@@ -7,7 +8,7 @@ export function rotuloSubcategoria(id: string): string { return ROTULOS_SUBCATEG
 export function rotuloCategoria(id: string): string { const conhecidos:Record<string,string>={picole:"Picolés",sorvete:"Sorvetes",paleta:"Paletas",acai:"Açaí",monte_do_jeito:"Monte do seu jeito",hamburguer:"Hambúrgueres",pizza:"Pizzas",bebida:"Bebidas",sobremesa:"Sobremesas"};if(conhecidos[id])return conhecidos[id];return id.replace(/_/g," ").replace(/\b\w/g,l=>l.toUpperCase()); }
 export interface Variacao { id:string;nome:string;preco:number }
 export interface Adicional { id:string;nome:string;preco:number }
-export interface Produto { id:string;categoria:Categoria;categoriaId?:string;categoriaOrdem?:number;subcategoria?:string;subcategoriaId?:string;subcategoriaOrdem?:number;nome:string;descricao?:string;foto?:string;ativo:boolean;ordem?:number;preco?:number;precoPromocional?:number;variacoes:Variacao[];adicionaisDisponiveis?:Adicional[] }
+export interface Produto { id:string;categoria:Categoria;categoriaId?:string;categoriaOrdem?:number;subcategoria?:string;subcategoriaId?:string;subcategoriaOrdem?:number;nome:string;descricao?:string;foto?:string;ativo:boolean;ordem?:number;preco?:number;precoPromocional?:number;variacoes:Variacao[];adicionaisDisponiveis?:Adicional[];gruposAdicionais?:GrupoAdicionais[] }
 export interface ItemCarrinho { produtoId:string;nome:string;variacaoId:string;variacaoNome:string;adicionais:Adicional[];quantidade:number;precoUnitario:number }
 export type TipoEntrega="entrega"|"retirada";export type FormaPagamento="pix"|"cartao"|"dinheiro";export type StatusPedido="recebido"|"em_preparo"|"saiu_para_entrega"|"entregue"|"cancelado";
 export interface Cliente{id:string;nome:string;telefone:string;cpf:string;endereco?:string;gastoAcumuladoFidelidade:number;cupomDisponivel:boolean}
