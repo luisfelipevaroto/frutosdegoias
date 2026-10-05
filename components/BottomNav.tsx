@@ -15,7 +15,7 @@ function IconCarrinho(){return <svg viewBox="0 0 24 24" className="h-6 w-6" fill
 export default function BottomNav(){
  const path=usePathname();const {itens}=useCarrinho();const [cadastrado,setCadastrado]=useState(false);
  useEffect(()=>{try{setCadastrado(!!localStorage.getItem(KEY))}catch{}},[path]);
- if(path.startsWith('/admin')) return null;
+ if(path.startsWith('/admin') || path.startsWith('/superadmin')) return null;
  const qtd=itens.reduce((s,i)=>s+i.quantidade,0);const perfilHref=cadastrado?'/conta':'/cadastro';const perfilLabel=cadastrado?'Perfil':'Entrar';
  const ativo=(href:string)=>href==='/'?path==='/':path===href||path.startsWith(href+'/');
  const mobileItem=(href:string,label:string,icon:React.ReactNode)=><Link href={href} className={`relative flex flex-1 flex-col items-center justify-center gap-0.5 py-2 text-[11px] ${ativo(href)?'text-brand-700':'text-neutral-500'}`}>{icon}<span>{label}</span></Link>;
