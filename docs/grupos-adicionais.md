@@ -25,3 +25,7 @@ As novas tabelas têm RLS por empresa. Os cadastros usam funções com `SECURITY
 - Conferência visual dos componentes reais em uma demonstração local com estados de seleção vazia e limite atingido. O teste completo com login no Preview deve ser feito pelo proprietário, com seu usuário exclusivo do piloto.
 
 Não foram criados grupos nem alterados produtos do catálogo automaticamente. Os testes SQL não deixaram empresas, clientes ou pedidos adicionais no piloto.
+
+## Ordem dos itens
+
+Os itens seguem a sequência do cadastro, tanto no painel quanto no cardápio e no PDV. Ao salvar um grupo, a sequência das linhas é gravada; renomear um item não altera sua posição. Para publicar a versão com ordenação, aplique `supabase/ordem-itens-grupos.sql` depois de `supabase/grupos-adicionais.sql`. Nos grupos anteriores, a ordem de cadastro não era armazenada: a atualização conserva a sequência retornada pelo painel; abrir e salvar o grupo fixa a sequência desejada.
