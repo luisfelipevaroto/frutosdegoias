@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { cotarUber, enderecoLoja, tokenUber } from '@/lib/uber-server';
 export const runtime='nodejs';
+export const maxDuration=60;
 export async function POST(req:Request){try{
  const {empresaId,endereco}=await req.json();if(typeof empresaId!=='string'||typeof endereco!=='string'||!endereco.trim()||endereco.length>1000)return NextResponse.json({error:'Informe o endereço completo.'},{status:400});
  const url=process.env.NEXT_PUBLIC_SUPABASE_URL,key=process.env.SUPABASE_SERVICE_ROLE_KEY;if(!url||!key)return NextResponse.json({error:'Servidor não configurado.'},{status:503});
@@ -11,3 +12,4 @@ export async function POST(req:Request){try{
  const cred=Array.isArray(c.data)?c.data[0]:c.data;if(c.error||!cred)throw new Error('Configure a integração Uber.');
  const result=await cotarUber(db,cred,await tokenUber(cred),empresaId,enderecoLoja(e.data),endereco.trim());return NextResponse.json({...result,nome:'Uber envio',provedor:'uber_direct'});
 }catch(e){return NextResponse.json({error:e instanceof Error?e.message:'Não foi possível calcular a entrega.'},{status:422});}}
+

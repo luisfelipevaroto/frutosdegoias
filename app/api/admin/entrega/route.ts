@@ -3,6 +3,7 @@ import { autorizarEmpresa } from '@/lib/admin-server';
 import { chamarUber, cotarUber, enderecoLoja, resumoUber, tokenUber } from '@/lib/uber-server';
 import { telefoneUber } from '@/lib/entregas';
 export const runtime='nodejs';
+export const maxDuration=60;
 export async function POST(req:Request){
  let db:any,entrega:any,criou=false;
  try {
@@ -48,3 +49,4 @@ export async function POST(req:Request){
   const s=resumoUber(r.body);const apply=await db.rpc('aplicar_evento_uber',{p_entrega:entrega.id,p_evento:null,p_externo:s.id,p_status:s.status,p_quando:s.updated,p_resumo:s});if(apply.error)throw new Error('A corrida pode ter sido criada. Retome a solicitação para recuperar a confirmação.');criou=false;return NextResponse.json({ok:true});
  }catch(e){if(criou&&db&&entrega?.id)await db.from('entregas_integradas').update({status:'incerto',erro:'Confirmação pendente. Retome com a mesma identificação.'}).eq('id',entrega.id).is('entrega_externa_id',null).eq('status','solicitando');return NextResponse.json({error:e instanceof Error?e.message:'Não foi possível atualizar a entrega.'},{status:422});}
 }
+
