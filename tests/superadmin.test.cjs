@@ -18,6 +18,15 @@ function load(file, mocks = {}) {
 }
 const core = load('lib/superadmin.ts');
 const produtosAdmin = load('lib/produtos-admin.ts');
+const producao=load('lib/producao.ts');
+test('production text preserves free text exactly and translates existing preset codes',()=>{
+  assert.equal(producao.textoProducao('30_40'),'de 30 a 40 min');
+  assert.equal(producao.textoProducao('40_50'),'de 40 a 50 min');
+  assert.equal(producao.textoProducao('ate_1h'),'Em até 1h');
+  assert.equal(producao.textoProducao('mais_1h'),'Estamos com alto volume de pedidos, previsão de mais de 1h para entrega.');
+  for(const text of ['30_40','mais_1h','Preparo: 25–35 minutos\nRetirada: aguarde a confirmação.','  De 20 a 30 min  ','constructor','<b>35 minutos</b>'])assert.equal(producao.textoProducao(text,true),text);
+  assert.equal(producao.textoProducao(null),'');
+});
 const grupos = load('lib/grupos-adicionais.ts');
 const frutas={id:'frutas',nome:'Frutas',gratis:true,minimo:1,maximo:3,itens:[1,2,3,4].map(n=>({id:`f${n}`,nome:`Fruta ${n}`,preco:10}))};
 const pagos={id:'pagos',nome:'Adicionais',gratis:false,minimo:1,maximo:null,itens:[1,2,3,4].map(n=>({id:`p${n}`,nome:`Pago ${n}`,preco:4}))};
