@@ -1,0 +1,10 @@
+"use client";
+import type { Adicional } from "@/lib/types";
+import { GrupoAdicionais,alternarItemGrupo } from "@/lib/grupos-adicionais";
+export default function EscolhaGrupos({grupos,selecionados,onChange}:{grupos:GrupoAdicionais[];selecionados:Adicional[];onChange:(itens:Adicional[])=>void}) {
+  return <div className="space-y-5">{grupos.map(g=>{const count=g.itens.filter(a=>selecionados.some(s=>s.id===a.id)).length;return <section key={g.id} className="overflow-hidden rounded-xl border">
+    <div className="flex items-start justify-between gap-3 bg-neutral-100 p-3"><div className="min-w-0"><h3 className="break-words font-bold">{g.nome}</h3><p className="mt-1 text-xs text-neutral-600">{g.maximo===g.minimo?`Escolha ${g.minimo} ${g.minimo===1?"opção":"opções"}`:`Escolha pelo menos ${g.minimo}${g.maximo!==null?` e no máximo ${g.maximo}`:""} ${g.minimo===1&&g.maximo===null?"opção":"opções"}`}{g.gratis?" · Grátis":""}</p><p className="mt-1 text-xs font-semibold" aria-live="polite">{count}{g.maximo!==null?`/${g.maximo}`:""} selecionado{count===1?"":"s"}{g.maximo!==null&&count>=g.maximo?" · Limite atingido":""}</p></div><span className="shrink-0 rounded bg-neutral-900 px-2 py-1 text-[10px] font-bold text-white">OBRIGATÓRIO</span></div>
+    {g.itens.map(a=>{const selected=selecionados.some(s=>s.id===a.id),blocked=!selected&&g.maximo!==null&&count>=g.maximo;return <label key={a.id} className={`flex items-center justify-between gap-3 border-t p-3 text-sm ${blocked?"cursor-not-allowed text-neutral-400":"cursor-pointer"}`}><span className="min-w-0 break-words">{a.nome}</span><span className="ml-auto shrink-0 text-xs">{g.gratis?"Grátis":Number(a.preco).toLocaleString("pt-BR",{style:"currency",currency:"BRL"})}</span><input type="checkbox" checked={selected} disabled={blocked} onChange={()=>onChange(alternarItemGrupo(g,a,selecionados))} aria-label={`${a.nome}, ${g.nome}`} className="h-4 w-4 shrink-0 accent-brand-700"/></label>})}
+    {!g.itens.length&&<p className="p-3 text-sm text-red-700">Este grupo está sem opções disponíveis.</p>}
+  </section>;})}</div>;
+}

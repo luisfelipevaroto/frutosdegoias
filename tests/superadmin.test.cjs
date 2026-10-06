@@ -18,6 +18,34 @@ function load(file, mocks = {}) {
 }
 const core = load('lib/superadmin.ts');
 const produtosAdmin = load('lib/produtos-admin.ts');
+const producao=load('lib/producao.ts');
+test('production text preserves free text exactly and translates existing preset codes',()=>{
+  assert.equal(producao.textoProducao('30_40'),'de 30 a 40 min');
+  assert.equal(producao.textoProducao('40_50'),'de 40 a 50 min');
+  assert.equal(producao.textoProducao('ate_1h'),'Em até 1h');
+  assert.equal(producao.textoProducao('mais_1h'),'Estamos com alto volume de pedidos, previsão de mais de 1h para entrega.');
+  for(const text of ['30_40','mais_1h','Preparo: 25–35 minutos\nRetirada: aguarde a confirmação.','  De 20 a 30 min  ','constructor','<b>35 minutos</b>'])assert.equal(producao.textoProducao(text,true),text);
+  assert.equal(producao.textoProducao(null),'');
+});
+const grupos = load('lib/grupos-adicionais.ts');
+const frutas={id:'frutas',nome:'Frutas',gratis:true,minimo:1,maximo:3,itens:[1,2,3,4].map(n=>({id:`f${n}`,nome:`Fruta ${n}`,preco:10}))};
+const pagos={id:'pagos',nome:'Adicionais',gratis:false,minimo:1,maximo:null,itens:[1,2,3,4].map(n=>({id:`p${n}`,nome:`Pago ${n}`,preco:4}))};
+test('free groups lock at the maximum, allow deselection and never charge selected items',()=>{
+  let selected=[];for(const item of frutas.itens)selected=grupos.alternarItemGrupo(frutas,item,selected);
+  assert.equal(selected.length,3);assert.equal(selected.reduce((s,a)=>s+a.preco,0),0);
+  selected=grupos.alternarItemGrupo(frutas,frutas.itens[0],selected);assert.equal(selected.length,2);
+  selected=grupos.alternarItemGrupo(frutas,frutas.itens[3],selected);assert.equal(selected.length,3);assert.ok(selected.some(a=>a.id==='f4'));
+});
+test('every linked group enforces its minimum; paid choices add their own prices without a maximum',()=>{
+  assert.match(grupos.validarSelecaoGrupos([frutas,pagos],[]),/Frutas/);
+  let selected=grupos.alternarItemGrupo(frutas,frutas.itens[0],[]);
+  assert.match(grupos.validarSelecaoGrupos([frutas,pagos],selected),/Adicionais/);
+  for(const item of pagos.itens)selected=grupos.alternarItemGrupo(pagos,item,selected);
+  assert.equal(grupos.validarSelecaoGrupos([frutas,pagos],selected),'');assert.equal(selected.reduce((s,a)=>s+a.preco,0),16);
+  assert.match(grupos.validarSelecaoGrupos([{...frutas,minimo:2}],selected),/2 itens/);
+  assert.match(grupos.validarSelecaoGrupos([frutas],frutas.itens),/máximo/);
+  assert.equal(grupos.validarSelecaoGrupos([],[]),'');
+});
 test('product pages fetch twenty items with tenant scope and stable order',async()=>{
   const calls=[];const source=Array.from({length:47},(_,i)=>({id:String(i),nome:`Produto ${i}`,variacoes:[],produto_adicionais:[]}));
   const query={select:(fields,options)=>{assert.equal(options.count,'exact');assert.ok(fields.includes('variacoes'));return query;},eq:(key,value)=>{calls.push([key,value]);return query;},order:key=>{calls.push(['order',key]);return query;},range:async(from,to)=>({data:source.slice(from,to+1),count:source.length,error:null})};

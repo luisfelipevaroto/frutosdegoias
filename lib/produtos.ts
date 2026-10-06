@@ -26,6 +26,7 @@ export async function getProdutos(empresaId?: string): Promise<Produto[]> {
     preco: p.preco ?? undefined,
     precoPromocional: p.preco_promocional ?? undefined,
     variacoes: p.variacoes ?? [],
-    adicionaisDisponiveis: p.adicionais ?? undefined
+    adicionaisDisponiveis: p.adicionais ?? undefined,
+    gruposAdicionais: p.grupos_adicionais ?? []
   }));
 }
