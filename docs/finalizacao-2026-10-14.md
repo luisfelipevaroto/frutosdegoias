@@ -1,41 +1,49 @@
-# Finalização — acompanhamento em 14/10/2026
+# Finalização do delivery — 14/10/2026
 
-Regras comerciais confirmadas pelo proprietário: Mercado Pago da plataforma separado das lojas; teste de sete dias; suspensão sete dias após o vencimento. Nenhuma conta de integração foi informada como liberada. Tokens de Uber, iFood e PagBank serão obtidos pelo proprietário. Não incluir credenciais em arquivos, repositório ou conversa.
+## Regras confirmadas
 
-## Primeiro pacote preparado
+Assinaturas em uma conta Mercado Pago exclusiva do proprietário da plataforma, separada das lojas. Planos Básico R$29,90, Médio R$49,90 e Avançado R$99,90; teste de sete dias; suspensão sete dias após o vencimento. As contas Uber, iFood, PagBank e WhatsApp ainda não foram informadas como liberadas para homologação real.
 
-- Next.js 16.4.0 e React 19.3.0; adaptação de headers assíncronos e compilação webpack.
-- Checkout: mínimo e troco rejeitados dentro da transação; metadados de pagamento/entrega gravados juntos. Migração `checkout-atomico.sql` aplicada em produção; execução pública do criar_pedido legado revogada; serviço e PDV preservados.
-- Carrinho recuperado por empresa durante sete dias. O checkout continua calculando preço e disponibilidade no servidor; valores recuperados são apenas a apresentação provisória.
-- Mercado Pago: assinatura HMAC, consulta a Orders ou Payments, conferência de referência/empresa/moeda/valor, proteção para eventos atrasados não reverterem um pagamento confirmado. Falhas solicitam retentativa.
-- Pix usa o identificador estável do pedido como chave de idempotência e recupera a cobrança existente. Pix/cartão podem ser retomados no acompanhamento do pedido.
-- Nova configuração da chave de assinatura em Integrações. Selecionar Payments e Orders no painel de desenvolvedores Mercado Pago e cadastrar a chave de assinatura no delivery. Sem essa chave o webhook recusa a confirmação, em vez de aceitar um evento sem autenticação.
+## Situação das seis etapas
 
-## As seis etapas permanecem em andamento
+| Etapa | Entregue/preparado | Ainda falta |
+|---|---|---|
+| 1. Segurança | Next.js 16.4.0/React 19.3.0; criação legada de pedido privada; mínimo/troco/metadados na transação; novo pedido bloqueado para empresa inativa. | Revisão individual das demais funções privilegiadas e confirmação de posse do telefone no acesso do cliente. |
+| 2. Mercado Pago | HMAC; Orders/Payments; conferência de empresa, referência, moeda e valor; eventos atrasados não rebaixam pagamento; Pix com chave do pedido e recuperação da cobrança; retomada Pix/cartão no acompanhamento. | Homologação sandbox; conciliação agendada dos pagamentos das lojas; estorno; idempotência da criação inicial do pedido e retomada após falha de rede antes de receber seu identificador. |
+| 3. Uber/WhatsApp/PagBank | Uber conserva despacho/rastreamento e proteção de ambiente. WhatsApp tem fila, modelo aprovado, consentimento/plano, etapa Pronto, reserva atômica, retentativas e retorno assinado de entrega/leitura. | Contas/credenciais e homologação; cancelamento Uber pelo próprio delivery; checkout e confirmação PagBank ainda precisam ser implementados. |
+| 4. iFood/99 | Estrutura e cotação iFood existentes; despacho continua bloqueado para impedir promessa de entrega sem operação completa. | Confirmar modalidade/API contratada e implementar solicitação, rastreamento e cancelamento. 99 não está operacional. |
+| 5. SaaS/piloto | Link de assinatura e conciliação Mercado Pago SaaS; regra de suspensão/restauração; provisionamento de administrador/plano; ativação de senha sem enviar e-mail; acesso de empresa inativa para configuração; piloto reativado e migrações sincronizadas. | Configurar conta SaaS e homologar faturas/cancelamentos; revisar renovação/renegociação no provedor; conectar DNS/HTTPS de novos domínios na Vercel. |
+| 6. Histórico/carrinho | Carrinho por empresa por sete dias; quadro busca todos os abertos; histórico de vinte por página; totais do banco e distinção de pagamentos confirmados; relatórios respeitam o módulo do plano. | Validação autenticada com o operador e conferência das mensagens de recuperação em situações reais de rede. |
 
-1. Segurança: primeiro pacote acima. Revisão individual das demais funções privilegiadas ainda pendente.
-2. Mercado Pago: confirmação/retomada preparadas. Sandbox, conciliação agendada, estorno e recuperação de falha na criação inicial do pedido ainda pendentes; este pacote não os declara concluídos.
-3. Uber/WhatsApp/PagBank: Uber já tem despacho/rastreamento; validação comercial e corrida real pendentes. Serviço WhatsApp e checkout PagBank ainda precisam de implementação e homologação. Não ativar apenas por cadastrar token.
-4. iFood/99: aguardam acesso ao fluxo contratado e homologação; não apresentar como operacionais.
-5. Assinaturas/provisionamento: regra confirmada, mas recorrência/suspensão automática ainda não ativadas. Configurar credenciais exclusivas da conta SaaS, assinatura de webhook e agendamento; não reutilizar tokens das lojas. Provisionamento guiado ainda pendente. Consulta ao Pilot-teste expirou: não há sincronização confirmada. Nunca executar `reset.sql` para atualizar uma loja existente.
-6. Carrinho: persistência preparada. Histórico/paginação e agregação dos relatórios ainda pendentes.
+As seis etapas **não estão integralmente concluídas**. O código preparado e as migrações não equivalem à homologação dos provedores. Não houve cobrança, entrega, mensagem ou convite por e-mail real na execução. Os testes de integrações usam respostas simuladas.
 
-Este documento registra conclusão por funcionalidade. Não significa que as seis etapas foram entregues ou que integrações reais passaram em homologação. Não houve cobrança, entrega ou mensagem real nos testes.
+## Publicações
 
-Referências de implementação: [assinatura de notificações](https://www.mercadopago.com.br/developers/pt/docs/wallet-connect/notifications), [Orders](https://www.mercadopago.com.br/developers/en/docs/checkout-api-orders/notifications), [planos recorrentes](https://www.mercadopago.com.br/developers/pt/reference/online-payments/subscriptions/create-preapproval-plan/post).
+- PR9: checkout atômico, segurança de notificações, retomada de pagamentos e carrinho. Produção f538c0a.
+- PR10: histórico, preparação SaaS e provisionamento. Produção 9647317.
+- PR11: piloto sincronizado com produção, preservando histórico de ambas as branches. Pilot-teste foi restaurado de INACTIVE para ACTIVE_HEALTHY. Os três pedidos do piloto foram preservados; clientes/pedidos reais e credenciais não foram copiados.
+- PR12: serviço WhatsApp e configuração administrativa de empresa inativa. Conferir os checks da Vercel antes de considerar a publicação concluída.
 
-## Segundo pacote preparado
+Migrações aditivas aplicadas em produção e piloto: pagamentos exclusivos (piloto estava pendente), checkout atômico, resumo de pedidos, assinaturas automáticas e auditoria, provisionamento administrativo, fila WhatsApp e administração de empresa inativa. Nunca atualizar uma loja existente com reset.sql ou reexecutar a baseline.
 
-Histórico por período com páginas de vinte pedidos e totais agregados no banco; quadro operacional busca todos os pedidos abertos, independente dos cem registros antigos. Migração resumo-pedidos.sql aplicada em produção.
+## Configuração SaaS
 
-Cobrança SaaS: link hospedado Mercado Pago para o responsável autorizar a recorrência mensal; conciliação de faturas, regra de sete dias de atraso, restauração apenas de suspensão financeira própria e preservação de suspensão manual; proteção contra contrato editado enquanto a cobrança está vinculada. A criação interrompida não gera outra assinatura: o Superadmin pode vincular o identificador confirmado no provedor. Migrações assinaturas-automaticas.sql e ajustes de auditoria aplicados em produção. Zero contratos automáticos foram criados nos testes.
+No projeto Vercel da plataforma: SAAS_MERCADO_PAGO_ACCESS_TOKEN, SAAS_MERCADO_PAGO_AMBIENTE (teste/producao), SAAS_APP_URL (HTTPS), SAAS_MERCADO_PAGO_WEBHOOK_SECRET e CRON_SECRET. Usar notificações subscription_preapproval e subscription_authorized_payment em /api/assinaturas/webhook. Só ativar SAAS_AUTOMACAO_ATIVA=true depois da homologação. O cron diário às 09h de São Paulo não executa enquanto essa ativação estiver ausente. Preview aceita somente a conta de teste.
 
-Configuração exclusiva no projeto Vercel da plataforma: SAAS_MERCADO_PAGO_ACCESS_TOKEN, SAAS_MERCADO_PAGO_AMBIENTE (teste/producao), SAAS_APP_URL (HTTPS), SAAS_MERCADO_PAGO_WEBHOOK_SECRET e CRON_SECRET. Selecionar notificações subscription_preapproval e subscription_authorized_payment para /api/assinaturas/webhook. A conferência por webhook complementa o cron diário às 09h de São Paulo. Só definir SAAS_AUTOMACAO_ATIVA=true após homologar a conta e as regras; o cron permanece sem executar enquanto esse campo estiver ausente. Em preview usar somente conta/token de teste. Não colocar esses valores em NEXT_PUBLIC_* e não usar as credenciais das lojas.
+Nenhuma loja entra automaticamente na cobrança: o proprietário cadastra o contrato e vincula explicitamente o link, que exige autorização do responsável no Mercado Pago. O fim do teste usa a data do contrato comercial. Uma criação interrompida exige conferir/vincular a assinatura existente antes de gerar outra. Alteração manual do contrato interrompe a conciliação por divergência de versão; não altera silenciosamente o preço recorrente do provedor. Suspensão manual posterior é preservada na restauração.
 
-A conta SaaS ainda não foi configurada nesta execução e não houve testes financeiros reais. A assinatura usa a data de fim do teste cadastrada no contrato comercial; os planos existentes estão configurados para sete dias. Mudanças manuais no contrato não alteram silenciosamente a recorrência no provedor: conciliação interrompe a alteração de acesso em caso de versão divergente. Cancelamento de recorrência e renegociação requerem revisão no Mercado Pago antes de atualizar o contrato.
+## Configuração das lojas
 
-Provisionamento: preparar/vincular o administrador e escolher plano nos detalhes da empresa; novo usuário recebe um link privado de ativação a ser entregue pelo proprietário; nenhum e-mail é enviado pelo agente ou automaticamente por esse fluxo. Administrador existente mantém a senha. Link usa fragmento para evitar registros de servidor e a tela de ativação não carrega rastreamento. Migração provisionar-admin.sql aplicada. Domínio/DNS/HTTPS continuam exigindo conexão no projeto Vercel; o checklist de catálogo e abertura da loja está no painel.
+Mercado Pago: em Integrações, salvar a chave de assinatura e configurar Payments/Orders em /api/pagamentos/mercado-pago/webhook. Sem chave válida, a confirmação por webhook é recusada. Atualizar/rotacionar credenciais exige conferir essa configuração novamente.
 
-Validação local deste pacote: 49 testes aprovados, TypeScript e build aprovados. A verificação de pagamentos/convites utiliza respostas simuladas, sem enviar mensagens, criar assinaturas ou trocar senhas reais.
+WhatsApp: cadastrar token/número/WABA, versão do app e um modelo aprovado com três parâmetros no corpo (nome, número do pedido, etapa), sem cabeçalho dinâmico. Configurar o webhook mostrado no painel, App Secret e token de verificação. Autorizar os envios da empresa e, após homologação, configurar WHATSAPP_AUTOMACAO_ATIVA=true nos projetos que operam as lojas. O serviço continua desativado por padrão.
 
-Pilot-teste identificado como INACTIVE no Supabase; solicitada reativação para sincronização. Não executar migrações antes de confirmar que a restauração concluiu.
+Mudança de etapa, confirmação Mercado Pago e eventos Uber acionam a fila em segundo plano. Há processamento manual e contingência diária às 09h05. Rejeições definitivas têm espera crescente e até cinco tentativas. Resposta incerta aguarda revisão para evitar duplicidade. Notificação com mais de 24h não é enviada automaticamente. A conferência diária não representa processamento contínuo de retentativas.
+
+Nova empresa: conectar domínio/DNS/HTTPS ao projeto da plataforma; preparar administrador e plano nos detalhes da empresa; entregar o link privado ao responsável, que define a senha. Usuário existente mantém senha. O link usa fragmento, a tela não carrega rastreamento e nenhum e-mail é enviado por este fluxo. Cadastrar catálogo/horários/entrega/pagamentos e contrato; testar no piloto antes da abertura real.
+
+## Validação
+
+53 testes aprovados, TypeScript e build local aprovados. Verificadas permissões: anon não executa criação legada, reserva de notificações, conciliação SaaS ou identificação administrativa de empresa inativa. Produção tinha zero conexões Meta e zero contratos automáticos na verificação. Testes não confirmam áudio físico, contas liberadas ou pagamentos/corridas/mensagens reais.
+
+Referências: [Mercado Pago — notificações](https://www.mercadopago.com.br/developers/pt/docs/wallet-connect/notifications), [Orders](https://www.mercadopago.com.br/developers/en/docs/checkout-api-orders/notifications), [assinaturas](https://www.mercadopago.com.br/developers/pt/reference/online-payments/subscriptions/create-preapproval-plan/post), [Meta — exemplos oficiais](https://github.com/fbsamples/whatsapp-api-examples/blob/main/send-messages-flight-app-python/message_helper.py), [Supabase — generateLink](https://supabase.com/docs/reference/javascript/auth-admin-generatelink).
