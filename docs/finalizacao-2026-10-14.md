@@ -39,3 +39,17 @@ Provisionamento: preparar/vincular o administrador e escolher plano nos detalhes
 Validação local deste pacote: 49 testes aprovados, TypeScript e build aprovados. A verificação de pagamentos/convites utiliza respostas simuladas, sem enviar mensagens, criar assinaturas ou trocar senhas reais.
 
 Pilot-teste identificado como INACTIVE no Supabase; solicitada reativação para sincronização. Não executar migrações antes de confirmar que a restauração concluiu.
+
+## Terceiro pacote preparado
+
+WhatsApp: reserva atômica da fila, envio por modelo aprovado conferido na Meta, limites de tentativas, proteção para consentimento/plano/etapa atual e bloqueio de credenciais reais no preview. A configuração permite salvar sem autorizar envios, pausar e consultar os vinte retornos recentes. O webhook valida HMAC sobre os bytes originais e acompanha aceitação/entrega/leitura/falha sem regredir uma leitura. A fila inclui Pronto e ativação de acompanhamento.
+
+Depois de homologar a conta/modelo, configurar WHATSAPP_AUTOMACAO_ATIVA=true e CRON_SECRET nos projetos que operam as lojas. Alterações de etapa, confirmações de pagamento e eventos Uber acionam o processamento em segundo plano; há processamento manual no painel e uma conferência diária às 09h05. Tentativas conhecidamente rejeitadas têm espera crescente. Respostas incertas ficam em revisão; não há reenvio automático de uma chamada possivelmente aceita. Itens com mais de 24h ficam fora dos envios automáticos. A verificação diária é contingência e não substitui monitoramento contínuo da fila.
+
+Nova empresa inativa pode configurar seu painel com administrador vinculado, sem expor a empresa publicamente. O login identifica a empresa pelo acesso autenticado; autenticar um usuário não concede administração de outra empresa. Uma regra de banco bloqueia novos pedidos de empresa inativa, inclusive PDV, mantendo configuração e acompanhamento administrativo dos registros existentes.
+
+Migrados produção e piloto: whatsapp-worker.sql e admin-empresa-inativa.sql. A ferramenta retornou erro de sessão em duas tentativas da primeira migração. A consulta confirmou ausência de mudança parcial; a versão que substitui o gatilho no lugar foi aplicada e verificada.
+
+53 testes passaram; testes de envio e webhook usam respostas simuladas. Nenhuma mensagem, cobrança, convite por e-mail ou entrega real foi disparada. Homologação Meta, PagBank e Uber permanece dependente das contas liberadas. iFood/99 precisam de modalidade/API contratada antes do despacho real; continuam bloqueados.
+
+Referência do formato de mensagens: [exemplos oficiais Meta](https://github.com/fbsamples/whatsapp-api-examples/blob/main/send-messages-flight-app-python/message_helper.py).
