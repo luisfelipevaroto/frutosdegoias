@@ -8,7 +8,7 @@ import { createClient } from "@supabase/supabase-js";
 import type { Metadata } from "next";
 
 export async function generateMetadata(): Promise<Metadata> {
-  const h = headers();
+  const h = await headers();
   const rawHost = h.get("x-forwarded-host") || h.get("host") || "";
   const host = rawHost.split(",")[0].trim().split(":")[0].toLowerCase();
   try {
