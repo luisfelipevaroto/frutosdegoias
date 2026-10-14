@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
+import {pagamentoVerificado} from '@/lib/mercado-pago-eventos';
 import{pagamentoPermitido}from'@/lib/pagamentos';
 
 export async function POST(req:Request){
@@ -18,12 +19,12 @@ export async function POST(req:Request){
   const {data:c}=await db.from("integracoes_credenciais").select("credenciais,ambiente").eq("empresa_id",p.empresa_id).eq("provedor","mercado_pago").eq('pagamento_conectado',true).maybeSingle();
   const token=(c?.credenciais as any)?.access_token;
   if(!i||!token)return NextResponse.json({error:"Mercado Pago não está conectado para esta empresa."},{status:400});
-  const amount=Number(p.valor_total).toFixed(2);
+  if(process.env.VERCEL_ENV==="preview"&&c?.ambiente!=="teste")return NextResponse.json({error:"Preview aceita somente credenciais de teste."},{status:409});const amount=Number(p.valor_total).toFixed(2);
   const body={type:"online",total_amount:amount,external_reference:p.id,processing_mode:"automatic",transactions:{payments:[{amount,payment_method:{id:"pix",type:"bank_transfer"}}]},payer:{email:String(email).trim(),identification:{type:"CPF",number:String(cpf||"").replace(/\D/g,"")}}};
   const previous=String(p.pagamento_externo_id||""); const r=await fetch(previous.startsWith("ORD")?`https://api.mercadopago.com/v1/orders/${encodeURIComponent(previous)}`:"https://api.mercadopago.com/v1/orders",previous.startsWith("ORD")?{headers:{Authorization:`Bearer ${token}`},cache:"no-store",signal:AbortSignal.timeout(10000)}:{method:"POST",headers:{Authorization:`Bearer ${token}`,"Content-Type":"application/json","X-Idempotency-Key":p.id},body:JSON.stringify(body),signal:AbortSignal.timeout(10000)});
   const d=await r.json();if(!r.ok)return NextResponse.json({error:d.message||d.error||"Mercado Pago recusou a cobrança."},{status:400});
   const pay=d?.transactions?.payments?.[0],pm=pay?.payment_method||{};
-  const saved=await db.from("pedidos").update({provedor_pagamento:"mercado_pago",pagamento_externo_id:d.id,status_pagamento:"pendente",pagamento_url:pm.ticket_url||null}).eq("id",p.id).eq("empresa_id",p.empresa_id).eq("status_pagamento","pendente"); if(saved.error)return NextResponse.json({error:"Cobrança iniciada, mas o registro falhou. Tente recuperar o pagamento do mesmo pedido."},{status:503});
+  const saved=await db.from("pedidos").update({provedor_pagamento:"mercado_pago",pagamento_externo_id:d.id,status_pagamento:pagamentoVerificado(d,"order",p)||"pendente",pagamento_url:pm.ticket_url||null}).eq("id",p.id).eq("empresa_id",p.empresa_id).eq("status_pagamento","pendente"); if(saved.error)return NextResponse.json({error:"Cobrança iniciada, mas o registro falhou. Tente recuperar o pagamento do mesmo pedido."},{status:503});
   return NextResponse.json({orderId:d.id,pedidoNumero:p.numero,status:pay?.status||d.status,qrCode:pm.qr_code||null,qrCodeBase64:pm.qr_code_base64||null,ticketUrl:pm.ticket_url||null,ambiente:c?.ambiente||"teste"});
  }catch{return NextResponse.json({error:"Não foi possível gerar o PIX."},{status:400})}
 }
