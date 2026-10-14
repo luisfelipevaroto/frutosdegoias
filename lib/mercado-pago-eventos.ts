@@ -12,7 +12,7 @@ export function pagamentoVerificado(resource: any, kind: 'order' | 'payment', pe
   if (!Number.isFinite(total) || Math.round(total*100) !== Math.round(Number(pedido.valor_total)*100)) return null;
   const status = String(resource.status || '');
   if (status === 'approved' || status === 'processed' && resource.status_detail === 'accredited') return 'pago';
-  if (status === 'refunded') return 'reembolsado';
+  if (status === 'refunded' || kind==='order' && status==='processed' && resource.status_detail==='refunded') return 'reembolsado';
   if (status === 'rejected' || status === 'failed') return 'recusado';
   if (status === 'cancelled' || status === 'canceled') return 'cancelado';
   return null;

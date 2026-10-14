@@ -1,4 +1,5 @@
-import {NextResponse} from 'next/server';
+import {NextResponse,after} from 'next/server';
+import {processarFilaWhatsApp} from '@/lib/whatsapp-server';
 import {createClient} from '@supabase/supabase-js';
 import {assinaturaValida,pagamentoVerificado} from '@/lib/mercado-pago-eventos';
 export async function POST(req:Request) {
@@ -30,6 +31,7 @@ export async function POST(req:Request) {
    if(!status)return NextResponse.json({ok:true});
    const update=await db.from('pedidos').update({status_pagamento:status,...(type==='payment'?{mercado_pago_payment_id:String(resource.id)}:{})}).eq('id',order.data.id).eq('empresa_id',c.empresa_id).eq('provedor_pagamento','mercado_pago').in('status_pagamento',status==='reembolsado'?['pago','reembolsado']:['pendente','recusado']);
    if(update.error)return NextResponse.json({error:'Evento não confirmado.'},{status:503});
+   if(process.env.WHATSAPP_AUTOMACAO_ATIVA==='true')after(()=>processarFilaWhatsApp(db,c.empresa_id));
    return NextResponse.json({ok:true});
   }
   if(!configured)return NextResponse.json({error:'Configure a chave de assinatura do webhook.'},{status:503});

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { Empresa, getEmpresaAtual } from "@/lib/empresa";
+import {getEmpresaAdminAtual} from '@/lib/empresa-admin';
 
 export default function AdminLogin() {
   const router = useRouter();
@@ -18,10 +19,10 @@ export default function AdminLogin() {
 
   async function entrar(e: FormEvent) {
     e.preventDefault(); setLoading(true); setErro("");
-    const tenant = empresa ?? await getEmpresaAtual();
-    if (!tenant) { setErro("Não foi possível identificar a empresa deste endereço."); setLoading(false); return; }
     const { data, error } = await supabase.auth.signInWithPassword({ email, password: senha });
     if (error || !data.user) { setErro(error?.message ?? "Não foi possível entrar."); setLoading(false); return; }
+    const tenant = empresa ?? await getEmpresaAdminAtual(data.user.id);
+    if (!tenant) { await supabase.auth.signOut(); setErro("Seu usuário não possui acesso administrativo a este endereço."); setLoading(false); return; }
     const { data: admin, error: acessoErro } = await supabase.from("admin_users").select("user_id").eq("user_id", data.user.id).eq("empresa_id", tenant.id).maybeSingle();
     if (acessoErro || !admin) { await supabase.auth.signOut(); setErro(`Este usuário não possui acesso ao painel de ${tenant.nome}.`); setLoading(false); return; }
     router.replace("/admin");

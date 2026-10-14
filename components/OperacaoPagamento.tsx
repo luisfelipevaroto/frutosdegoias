@@ -1,0 +1,8 @@
+"use client";
+import {useState} from 'react';
+import {supabase} from '@/lib/supabase';
+export default function OperacaoPagamento({empresaId,pedido,atualizado}:{empresaId:string;pedido:any;atualizado:()=>void}){
+ const [busy,setBusy]=useState(false),[message,setMessage]=useState('');if(pedido.provedor_pagamento!=='mercado_pago')return null;
+ async function act(acao:string){if(acao==='estornar'&&!window.confirm(`Devolver o valor integral do pedido #${pedido.numero} pelo Mercado Pago? Esta ação movimenta dinheiro.`))return;setBusy(true);setMessage('');try{const {data:{session}}=await supabase.auth.getSession();if(!session)throw Error('Entre novamente no painel.');const r=await fetch('/api/admin/pagamentos/operacao',{method:'POST',headers:{Authorization:`Bearer ${session.access_token}`,'Content-Type':'application/json'},body:JSON.stringify({empresaId,pedidoId:pedido.id,acao})});const d=await r.json();if(!r.ok)throw Error(d.error);setMessage(d.mensagem||`Pagamento: ${d.status}`);atualizado();}catch(e){setMessage(e instanceof Error?e.message:'Operação indisponível.');}finally{setBusy(false);}}
+ return <div className="mt-3 space-y-2"><button disabled={busy} onClick={()=>act('conciliar')} className="rounded border px-3 py-2 text-xs disabled:opacity-50">Conferir pagamento</button>{pedido.status_pedido==='cancelado'&&pedido.status_pagamento==='pago'&&<button disabled={busy} onClick={()=>act('estornar')} className="ml-2 rounded border border-red-200 px-3 py-2 text-xs text-red-700 disabled:opacity-50">Estornar valor integral</button>}<p role="status" className="text-xs">{message}</p></div>;
+}

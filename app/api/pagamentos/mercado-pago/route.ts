@@ -53,7 +53,7 @@ export async function POST(req: Request) {
       );
     }
 
-    const origin = process.env.MERCADO_PAGO_APP_URL || new URL(req.url).origin;
+    if(process.env.VERCEL_ENV==="preview"&&credencial.ambiente!=="teste")return NextResponse.json({error:"Preview aceita somente credenciais de teste."},{status:409});const origin = process.env.MERCADO_PAGO_APP_URL || new URL(req.url).origin;
 
     const body = {
       items: [

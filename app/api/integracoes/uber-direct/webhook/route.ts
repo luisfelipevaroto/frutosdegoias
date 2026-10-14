@@ -1,4 +1,5 @@
-import { NextResponse } from 'next/server';
+import { NextResponse,after } from 'next/server';
+import {processarFilaWhatsApp} from '@/lib/whatsapp-server';
 import { createClient } from '@supabase/supabase-js';
 import { createHmac,timingSafeEqual } from 'crypto';
 import { resumoUber } from '@/lib/uber-server';
@@ -18,5 +19,5 @@ export async function POST(req:Request){try{
  if(typeof body.live_mode==='boolean'&&body.live_mode!==(cred.ambiente==='producao'))return new NextResponse(null,{status:409});
  if(body.data?.id&&body.data.id!==id)return new NextResponse(null,{status:400});
  const s=resumoUber({...body.data,id,status:body.status??body.data?.status});const when=body.created??body.data?.updated;if(!Number.isFinite(Date.parse(when)))return new NextResponse(null,{status:400});
- const r=await db.rpc('aplicar_evento_uber',{p_entrega:e.data.id,p_evento:body.id,p_externo:id,p_status:s.status,p_quando:when,p_resumo:s});return new NextResponse(null,{status:r.error?503:200});
+ const r=await db.rpc('aplicar_evento_uber',{p_entrega:e.data.id,p_evento:body.id,p_externo:id,p_status:s.status,p_quando:when,p_resumo:s});if(!r.error&&process.env.WHATSAPP_AUTOMACAO_ATIVA==='true'){const eid=e.data.empresa_id;after(()=>processarFilaWhatsApp(db,eid));}return new NextResponse(null,{status:r.error?503:200});
 }catch{return new NextResponse(null,{status:503});}}
