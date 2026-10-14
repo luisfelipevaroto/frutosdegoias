@@ -23,3 +23,19 @@ Regras comerciais confirmadas pelo proprietário: Mercado Pago da plataforma sep
 Este documento registra conclusão por funcionalidade. Não significa que as seis etapas foram entregues ou que integrações reais passaram em homologação. Não houve cobrança, entrega ou mensagem real nos testes.
 
 Referências de implementação: [assinatura de notificações](https://www.mercadopago.com.br/developers/pt/docs/wallet-connect/notifications), [Orders](https://www.mercadopago.com.br/developers/en/docs/checkout-api-orders/notifications), [planos recorrentes](https://www.mercadopago.com.br/developers/pt/reference/online-payments/subscriptions/create-preapproval-plan/post).
+
+## Segundo pacote preparado
+
+Histórico por período com páginas de vinte pedidos e totais agregados no banco; quadro operacional busca todos os pedidos abertos, independente dos cem registros antigos. Migração resumo-pedidos.sql aplicada em produção.
+
+Cobrança SaaS: link hospedado Mercado Pago para o responsável autorizar a recorrência mensal; conciliação de faturas, regra de sete dias de atraso, restauração apenas de suspensão financeira própria e preservação de suspensão manual; proteção contra contrato editado enquanto a cobrança está vinculada. A criação interrompida não gera outra assinatura: o Superadmin pode vincular o identificador confirmado no provedor. Migrações assinaturas-automaticas.sql e ajustes de auditoria aplicados em produção. Zero contratos automáticos foram criados nos testes.
+
+Configuração exclusiva no projeto Vercel da plataforma: SAAS_MERCADO_PAGO_ACCESS_TOKEN, SAAS_MERCADO_PAGO_AMBIENTE (teste/producao), SAAS_APP_URL (HTTPS), SAAS_MERCADO_PAGO_WEBHOOK_SECRET e CRON_SECRET. Selecionar notificações subscription_preapproval e subscription_authorized_payment para /api/assinaturas/webhook. A conferência por webhook complementa o cron diário às 09h de São Paulo. Só definir SAAS_AUTOMACAO_ATIVA=true após homologar a conta e as regras; o cron permanece sem executar enquanto esse campo estiver ausente. Em preview usar somente conta/token de teste. Não colocar esses valores em NEXT_PUBLIC_* e não usar as credenciais das lojas.
+
+A conta SaaS ainda não foi configurada nesta execução e não houve testes financeiros reais. A assinatura usa a data de fim do teste cadastrada no contrato comercial; os planos existentes estão configurados para sete dias. Mudanças manuais no contrato não alteram silenciosamente a recorrência no provedor: conciliação interrompe a alteração de acesso em caso de versão divergente. Cancelamento de recorrência e renegociação requerem revisão no Mercado Pago antes de atualizar o contrato.
+
+Provisionamento: preparar/vincular o administrador e escolher plano nos detalhes da empresa; novo usuário recebe um link privado de ativação a ser entregue pelo proprietário; nenhum e-mail é enviado pelo agente ou automaticamente por esse fluxo. Administrador existente mantém a senha. Link usa fragmento para evitar registros de servidor e a tela de ativação não carrega rastreamento. Migração provisionar-admin.sql aplicada. Domínio/DNS/HTTPS continuam exigindo conexão no projeto Vercel; o checklist de catálogo e abertura da loja está no painel.
+
+Validação local deste pacote: 49 testes aprovados, TypeScript e build aprovados. A verificação de pagamentos/convites utiliza respostas simuladas, sem enviar mensagens, criar assinaturas ou trocar senhas reais.
+
+Pilot-teste identificado como INACTIVE no Supabase; solicitada reativação para sincronização. Não executar migrações antes de confirmar que a restauração concluiu.
