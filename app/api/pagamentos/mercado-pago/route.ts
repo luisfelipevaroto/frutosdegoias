@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import {pagamentoPermitido} from '@/lib/pagamentos';
 
 export async function POST(req: Request) {
   try {
@@ -16,7 +17,7 @@ export async function POST(req: Request) {
 
     const { data: pedido } = await db
       .from("pedidos")
-      .select("id,numero,empresa_id,valor_total")
+      .select("id,numero,empresa_id,valor_total,forma_pagamento,provedor_pagamento,status_pagamento,status_pedido,pagamento_url")
       .eq("id", pedidoId)
       .single();
 
@@ -24,11 +25,17 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Pedido não encontrado." }, { status: 404 });
     }
 
+    if(pedido.status_pagamento==='pago'||pedido.status_pedido==='cancelado')return NextResponse.json({error:'Pedido pago ou cancelado.'},{status:409});
+    const [config,status]=await Promise.all([db.from('configuracoes_loja').select('valor').eq('empresa_id',pedido.empresa_id).eq('chave','pagamentos').maybeSingle(),db.rpc('status_pagamento_online',{p_empresa_id:pedido.empresa_id})]);
+    if(config.error||status.error||pedido.provedor_pagamento!=='mercado_pago'||pedido.forma_pagamento!=='cartao'||!pagamentoPermitido(config.data?.valor,status.data??[],'cartao',true))return NextResponse.json({error:'Cartão de crédito online indisponível.'},{status:400});
+    if(pedido.pagamento_url)return NextResponse.json({url:pedido.pagamento_url});
+
     const { data: credencial } = await db
       .from("integracoes_credenciais")
       .select("credenciais,ambiente")
       .eq("empresa_id", pedido.empresa_id)
       .eq("provedor", "mercado_pago")
+      .eq("pagamento_conectado",true)
       .single();
 
     if (!credencial) {
@@ -65,6 +72,7 @@ export async function POST(req: Request) {
         failure: `${origin}/pedido/${pedido.numero}?pagamento=erro`,
       },
       auto_return: "approved",
+      payment_methods:{excluded_payment_types:['ticket','bank_transfer','debit_card','prepaid_card','atm','account_money'].map(id=>({id}))},
       notification_url: `${origin}/api/pagamentos/mercado-pago/webhook`,
     };
 
@@ -91,7 +99,7 @@ export async function POST(req: Request) {
         ? data.sandbox_init_point || data.init_point
         : data.init_point;
 
-    await db
+    const saved=await db
       .from("pedidos")
       .update({
         provedor_pagamento: "mercado_pago",
@@ -101,6 +109,7 @@ export async function POST(req: Request) {
       })
       .eq("id", pedido.id)
       .eq("empresa_id", pedido.empresa_id);
+    if(saved.error)return NextResponse.json({error:'Não foi possível registrar o pagamento.'},{status:503});
 
     return NextResponse.json({ url: paymentUrl });
   } catch {

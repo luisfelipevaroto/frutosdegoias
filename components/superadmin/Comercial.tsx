@@ -1,4 +1,5 @@
 "use client";
+import CobrancaAutomatica from './CobrancaAutomatica';
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import type { DashboardSuperadmin } from "@/lib/superadmin";
@@ -35,7 +36,7 @@ export default function Comercial({ aba, empresas, atualizado }: { aba: "planos"
   if(!dados)return <section className="rounded-2xl border bg-white p-6">{busy?<p role="status">Carregando planos e assinaturas…</p>:<><p role="alert" className="text-sm text-red-700">{erro}</p><button onClick={carregar} className="mt-4 rounded-lg border p-2 text-sm">Tentar novamente</button></>}</section>;
   const resumo=resumoAssinaturas(dados.assinaturas),hoje=dataSaoPaulo();
   const visiveis=empresas.filter(e=>e.nome.toLocaleLowerCase("pt-BR").includes(busca.toLocaleLowerCase("pt-BR"))&&(filtro==="todos"||(filtro==="sem"?!dados.assinaturas.some(s=>s.empresa_id===e.id):dados.assinaturas.some(s=>s.empresa_id===e.id&&s.status===filtro))));
-  return <>
+  return <>{aba==="assinaturas"&&<CobrancaAutomatica empresas={empresas}/>}
     {erro&&<p role="alert" className="mb-4 rounded-xl bg-red-50 p-4 text-sm text-red-700">{erro}</p>}{msg&&<p role="status" className="mb-4 rounded-xl bg-green-50 p-4 text-sm text-green-700">{msg}</p>}
     <div className="mb-5 flex flex-wrap items-center justify-between gap-3"><p className="text-sm text-neutral-500">{aba==="planos"?"Defina os recursos e o preço de cada plano.":"Controle manual, sem cobrança automática ou bloqueio das lojas."}</p><div className="flex gap-2"><button disabled={busy||!!plano||!!sub} onClick={carregar} className="rounded-xl border bg-white p-2.5 text-sm disabled:opacity-50">Atualizar</button>{aba==="planos"&&<button disabled={busy||!!plano} onClick={()=>editarPlano()} className="rounded-xl bg-brand-700 p-2.5 text-sm font-semibold text-white disabled:opacity-50">+ Novo plano</button>}</div></div>
     {(plano||sub)&&<section className="mb-5 rounded-2xl border border-brand-200 bg-white p-5"><h3 className="text-lg font-bold">{plano?plano.id?"Editar plano":"Novo plano":`Assinatura · ${empresas.find(e=>e.id===sub!.empresa_id)?.nome}`}</h3><form onSubmit={salvar}><fieldset disabled={busy} className="mt-4 grid gap-4 sm:grid-cols-2">
