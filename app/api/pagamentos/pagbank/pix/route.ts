@@ -1,6 +1,6 @@
 import {NextResponse} from 'next/server';
 import {createClient} from '@supabase/supabase-js';
-import {criarPedidoPagBank,consultarPedidoPagBank} from '@/lib/pagbank/server';
+import {criarPedidoPagBank,consultarPedidoPagBank,PagBankApiError} from '@/lib/pagbank/server';
 import {pagamentoPermitido} from '@/lib/pagamentos';
 
 export async function POST(req:Request){
@@ -40,5 +40,5 @@ export async function POST(req:Request){
    if(saved.error||!saved.data?.length)return NextResponse.json({error:'Cobrança gerada, mas não foi possível vincular ao pedido. Contate a loja.'},{status:503});
   }
   return NextResponse.json({orderId:order.id,pedidoNumero:p.numero,qrCode:code,qrCodeBase64:null,ambiente:ambiente==='sandbox'?'teste':'producao'});
- }catch{return NextResponse.json({error:'Não foi possível gerar o PIX PagBank.'},{status:502})}
+ }catch(err){if(err instanceof PagBankApiError){console.error('PagBank PIX gateway HTTP',err.status);return NextResponse.json({error:err.status===401||err.status===403?'PagBank recusou a autenticação. Confira se o token pertence ao ambiente Sandbox.':err.status===400||err.status===422?'PagBank recusou os dados da cobrança PIX. Verifique CPF, chave PIX e habilitação da conta.':'PagBank indisponível no momento.',codigo:'PAGBANK_HTTP_'+err.status},{status:502});}console.error('PagBank PIX falha',err instanceof Error?err.name:'erro desconhecido');return NextResponse.json({error:'Falha técnica ao gerar o PIX PagBank.',codigo:'PAGBANK_ERRO_INTERNO'},{status:502})}
 }
