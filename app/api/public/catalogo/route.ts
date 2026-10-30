@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPostgresPool } from '../../../../lib/postgres-server';
+import { resolveStoreDomain } from '../../../../lib/tenant-domain-server';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
-  const host = request.nextUrl.hostname.toLowerCase().replace(/\.$/, '');
+  const host = resolveStoreDomain(request);
   if (!host || host === 'localhost' || host === '127.0.0.1') {
     return NextResponse.json({ error: 'Domínio da loja não configurado' }, { status: 400 });
   }
