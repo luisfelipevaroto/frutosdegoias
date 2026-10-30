@@ -37,10 +37,24 @@ export async function GET(request: NextRequest) {
       'UNABLE_TO_VERIFY_LEAF_SIGNATURE', 'UNABLE_TO_GET_ISSUER_CERT_LOCALLY',
       'ERR_TLS_CERT_ALTNAME_INVALID', '28P01', '28000', '42501', '42P01',
     ]);
-    const category = error instanceof Error && error.message.startsWith('DATABASE_')
-      ? 'CONFIG'
-      : knownCodes.has(code) ? code : 'OTHER';
-    console.error('[delivery:empresa] falha na consulta', { category });
+    const message = error instanceof Error ? error.message : '';
+    const name = error instanceof Error ? error.name : 'UNKNOWN';
+    const category = message.startsWith('DATABASE_') ? 'CONFIG'
+      : knownCodes.has(code) ? code
+      : message.includes('certificate') || message.includes('SSL') || message.includes('TLS') ? 'TLS'
+      : message.includes('timeout') || message.includes('timed out') ? 'TIMEOUT'
+      : 'OTHER';
+    // Somente categorias predefinidas; nunca registrar mensagens brutas.
+    const knownNames = new Set(['Error', 'TypeError', 'AggregateError', 'DatabaseError']);
+    const safeName = knownNames.has(name) ? name : 'OTHER';
+    const cause = error && typeof error === 'object' && 'cause' in error ? error.cause : undefined;
+    const causeCode = cause && typeof cause === 'object' && 'code' in cause && typeof cause.code === 'string' ? cause.code : '';
+    console.error('[delivery:empresa] falha na consulta', {
+      category, name: safeName, code: knownCodes.has(code) ? code : 'OTHER',
+      causeCode: knownCodes.has(causeCode) ? causeCode : 'OTHER',
+      hasDatabaseUrl: Boolean(process.env.DATABASE_URL),
+      hasCaCert: Boolean(process.env.DATABASE_CA_CERT),
+    });
     return NextResponse.json({ error: 'Não foi possível consultar a loja' }, { status: 503 });
   }
 }
