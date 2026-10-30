@@ -20,15 +20,21 @@ export function getPostgresPool(): Pool {
     throw new Error('DATABASE_URL incompleta');
   }
 
-  // O node-postgres recebe a configuracao TLS explicitamente.
-  // Remover parametros SSL da URL evita sobrescrever rejectUnauthorized.
+  // A CA publica e fornecida via variavel de ambiente, nunca por arquivo da VPS.
+  // O Node valida a cadeia de certificados e o hostname do PgBouncer.
+  const ca = process.env.DATABASE_CA_CERT?.replace(/\\n/g, '\n').trim();
+  if (!ca || !ca.includes('-----BEGIN CERTIFICATE-----')) {
+    throw new Error('DATABASE_CA_CERT ausente ou invalido');
+  }
+
+  // SSL e configurado explicitamente para nao ser sobrescrito pela connection string.
   for (const key of ['sslmode', 'sslcert', 'sslkey', 'sslrootcert']) {
     url.searchParams.delete(key);
   }
 
   cachedPool = new Pool({
     connectionString: url.toString(),
-    ssl: { rejectUnauthorized: true },
+    ssl: { ca, rejectUnauthorized: true, servername: url.hostname },
     max: 3,
     connectionTimeoutMillis: 5000,
     idleTimeoutMillis: 10000,
