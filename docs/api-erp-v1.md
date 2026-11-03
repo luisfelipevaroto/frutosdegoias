@@ -83,3 +83,9 @@ As migrações `erp_api_keys_v1` e `erp_importacoes_v1` foram aplicadas ao proje
 Rate limit implementado: **60 chamadas por minuto UTC por chave ERP válida**, com contador atômico no PostgreSQL via `erp_api_consumir_limite(uuid)`. Acima do limite, a API responde `429` com cabeçalho `Retry-After: 60`. Migração `erp_rate_limit_v1` aplicada no Supabase original. Teste SQL transacional verificou 60 permissões e bloqueio na 61ª tentativa, seguido de rollback; nenhuma chave nem contador de teste persistiu. A função RPC concede EXECUTE somente a `service_role` e não a `anon`/`authenticated`.
 
 **Limites do teste:** ainda não houve teste HTTP com token válido; o controle é por chave válida, não protege tentativas de token inválido (requer proteção adicional no edge/WAF). Os registros de janelas antigas precisam de política de limpeza. A aplicação atualizada aguarda validação do build Preview.
+
+## Proteção contra chaves inválidas — 2026-11-03
+
+Implementado contador SQL atômico de **10 tentativas inválidas por minuto por identificador**; a 11ª retorna `429` e `Retry-After: 60`. Identificador: hash SHA-256 do IP de origem obtido de `x-vercel-forwarded-for` quando fornecido por proxy confiável; caso ausente, hash da credencial apresentada. Nenhum IP/token em texto puro é persistido. Migração `erp_invalid_attempts_v1` aplicada; teste transacional SQL verificou 10 permissões e bloqueio na 11ª chamada com rollback. O controle para chaves válidas continua em 60/minuto por chave.
+
+**Pendente para homologação HTTP:** testar chamadas ao Preview com chave real e respostas 401/429/200/201/409/404; verificar origem e confiabilidade do cabeçalho IP na Vercel e adicionar proteção de borda/WAF contra rotação de credenciais quando necessário. A execução externa HTTP não está disponível neste ambiente de teste. Limpeza de contadores antigos também está pendente.
