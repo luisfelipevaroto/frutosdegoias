@@ -1,6 +1,6 @@
 # API ERP v1 — especificação inicial
 
-Status: autenticação e gerenciamento de chaves implementados na branch de trabalho; migração SQL ainda não aplicada e endpoints de pedidos pendentes. Branch de trabalho `feat/erp-api-v1`.
+Status: autenticação, gerenciamento de chaves e leitura de pedidos implementados na branch de trabalho. Migração SQL ainda não aplicada; confirmação de importação e testes pendentes. Branch de trabalho `feat/erp-api-v1`.
 
 ## Autenticação
 
@@ -35,3 +35,21 @@ Criar migração SQL de credenciais e confirmações; implementar e testar endpo
 - `DELETE /api/admin/erp-chaves?empresa_id=<uuid>&id=<uuid>`: revoga a chave; exige JWT administrativo.
 - A empresa é identificada pelo hash da chave e não por parâmetro fornecido pelo ERP.
 - Não publicar até validar autorização de administradores, rate limiting, proteção de credenciais e testes automatizados.
+
+## Consulta de pedidos implementada (branch de desenvolvimento)
+
+`GET /api/v1/erp/pedidos?limit=50&cursor=<cursor>` retorna `data` e `pagination` (`limit`, `has_more`, `next_cursor`). O cursor é opaco, composto por `criado_em` e `id`. Limite de 1 a 100; omissão usa 50. A ordenação é crescente por criação e ID. O ERP deve guardar o último cursor processado, e usar `id` como chave única para evitar duplicações.
+
+`GET /api/v1/erp/pedidos/<uuid>` retorna pedido, cliente (nome, telefone, WhatsApp, endereço), itens, quantidades, preços unitários, nomes atuais de produtos e variações, adicionais atuais, forma/status de pagamento, entrega, descontos e observações. Os valores históricos de adicionais e nomes no momento da compra não estão armazenados na tabela de itens; campos com sufixo `_atual` são apenas referência e podem ter mudado. O ERP deve usar `valor_total` e `preco_unitario` registrados no pedido, não recalcular o valor total a partir do catálogo atual.
+
+### Limitação importante
+
+A listagem por `criado_em` é um feed de **novos pedidos**, não um feed completo de mudanças de status. Não há `atualizado_em` em `pedidos` no schema atual. Para sincronizar alterações, o ERP deve reconsultar pedidos relevantes por ID; antes de prometer atualização incremental de status, precisamos criar um registro de eventos/alterações com migração específica.
+
+### Exemplo de chamada
+
+```bash
+curl -H 'Authorization: Bearer SUA_CHAVE_ERP' 'https://SEU_DOMINIO/api/v1/erp/pedidos?limit=50'
+```
+
+Os endpoints ainda não foram testados em deploy de Preview e não devem ser considerados disponíveis em produção.
