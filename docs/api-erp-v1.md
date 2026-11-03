@@ -1,6 +1,6 @@
 # API ERP v1 — especificação inicial
 
-Status: autenticação, gerenciamento de chaves e leitura de pedidos implementados na branch de trabalho. Migração SQL ainda não aplicada; confirmação de importação e testes pendentes. Branch de trabalho `feat/erp-api-v1`.
+Status: autenticação, gerenciamento de chaves e leitura de pedidos implementados na branch de trabalho. Migração SQL ainda não aplicada; confirmação de importação implementada; migrações e testes pendentes. Branch de trabalho `feat/erp-api-v1`.
 
 ## Autenticação
 
@@ -53,3 +53,23 @@ curl -H 'Authorization: Bearer SUA_CHAVE_ERP' 'https://SEU_DOMINIO/api/v1/erp/pe
 ```
 
 Os endpoints ainda não foram testados em deploy de Preview e não devem ser considerados disponíveis em produção.
+
+## Confirmação de importação (implementada na branch)
+
+`POST /api/v1/erp/pedidos/<uuid>/confirmar` com `Authorization: Bearer <token>` e JSON opcional `{ "referencia_erp": "PED-123" }`.
+
+- Primeira confirmação: HTTP `201`, `{ "importado": true, "ja_importado": false, "pedido_id": "...", "referencia_erp": "PED-123", "importado_em": "..." }`.
+- Repetição com mesma referência: HTTP `200`, `ja_importado: true`.
+- Repetição com referência divergente: HTTP `409`.
+- Pedido inexistente ou de outra empresa: HTTP `404`.
+- A confirmação não modifica o status comercial ou financeiro do pedido.
+- A migração `supabase/migrations/20261103_erp_importacoes.sql` cria uma chave primária composta por empresa e pedido para impedir duplicações concorrentes.
+
+### Fluxo recomendado para o ERP
+
+1. Consultar novos pedidos paginados e buscar detalhes por ID.
+2. Gravar o pedido no banco local com índice único para o ID externo do delivery.
+3. Confirmar na API somente após a transação local ser concluída.
+4. Em falhas de rede, repetir a confirmação com a mesma referência; o endpoint é idempotente.
+
+A API ainda não foi homologada. Migrações SQL não foram executadas no Supabase de produção.
