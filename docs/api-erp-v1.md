@@ -77,3 +77,9 @@ A API ainda não foi homologada. Migrações SQL não foram executadas no Supaba
 ## Validação de migrações — 2026-11-03
 
 As migrações `erp_api_keys_v1` e `erp_importacoes_v1` foram aplicadas ao projeto Supabase original Frutos de Goias (`efbldnjqmfzxmhipzhux`). Conferência SQL: ambas as tabelas têm RLS ativo, sem SELECT para `anon` e `authenticated`, com SELECT para `service_role`. Teste SQL transacional criou chave temporária, confirmou o mesmo pedido duas vezes com `ON CONFLICT DO NOTHING`, verificou unicidade e executou `ROLLBACK`; contagens finais das duas tabelas: zero. O teste confirma constraints e idempotência em SQL, **não** comprova o funcionamento HTTP ponta a ponta. Deployment Preview do commit anterior `cff4040` está READY; aguardar compilação da revisão de migrações. Ainda faltam testes de autenticação real, controle de acesso entre empresas, limite de requisições e confirmação via endpoint HTTP antes de liberar a main.
+
+## Limitação de requisições — 2026-11-03
+
+Rate limit implementado: **60 chamadas por minuto UTC por chave ERP válida**, com contador atômico no PostgreSQL via `erp_api_consumir_limite(uuid)`. Acima do limite, a API responde `429` com cabeçalho `Retry-After: 60`. Migração `erp_rate_limit_v1` aplicada no Supabase original. Teste SQL transacional verificou 60 permissões e bloqueio na 61ª tentativa, seguido de rollback; nenhuma chave nem contador de teste persistiu. A função RPC concede EXECUTE somente a `service_role` e não a `anon`/`authenticated`.
+
+**Limites do teste:** ainda não houve teste HTTP com token válido; o controle é por chave válida, não protege tentativas de token inválido (requer proteção adicional no edge/WAF). Os registros de janelas antigas precisam de política de limpeza. A aplicação atualizada aguarda validação do build Preview.
