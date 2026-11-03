@@ -23,7 +23,14 @@ const DOMINIO_PADRAO = "frutos-de-goias-jf.vercel.app";
 export function dominioAtual() {
   if (typeof window === "undefined") return DOMINIO_PADRAO;
   const host = window.location.hostname.toLowerCase();
-  return host === "localhost" || host === "127.0.0.1" ? DOMINIO_PADRAO : host;
+  if (host === "localhost" || host === "127.0.0.1") return DOMINIO_PADRAO;
+  // O Preview desta aplicacao nao possui dominio de empresa cadastrado no banco.
+  // Mapear apenas os aliases de Preview conhecidos do projeto Frutos de Goias.
+  if (
+    host === "frutos-de-goias-jf-git-feat-erp-api-v1-luis-felipe13.vercel.app" ||
+    /^frutos-de-goias-[a-z0-9]+-luis-felipe13\\.vercel\\.app$/.test(host)
+  ) return DOMINIO_PADRAO;
+  return host;
 }
 
 export async function getEmpresaAtual(): Promise<Empresa | null> {
