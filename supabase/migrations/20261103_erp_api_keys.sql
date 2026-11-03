@@ -13,4 +13,5 @@ create table if not exists public.erp_api_chaves (
 create index if not exists erp_api_chaves_empresa_idx on public.erp_api_chaves(empresa_id);
 alter table public.erp_api_chaves enable row level security;
 revoke all on public.erp_api_chaves from anon, authenticated;
+grant select, insert, update, delete on public.erp_api_chaves to service_role;
 comment on table public.erp_api_chaves is 'Chaves de API ERP por empresa. Nunca armazenar o token em texto puro.';
