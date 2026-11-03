@@ -28,5 +28,13 @@ export async function autorizarErp(req: Request) {
     timingSafeEqual(Buffer.from(stored, 'hex'), Buffer.from(hash, 'hex'));
   const company = data?.empresas as unknown as { ativo?: boolean } | null;
   if (!equal || !company?.ativo) return erpError(401, 'Credencial invalida');
+  const { data: permitido, error: limiteError } = await db.rpc('erp_api_consumir_limite', { p_chave_id: data!.id });
+  if (limiteError) throw limiteError;
+  if (permitido !== true) {
+    return NextResponse.json({ error: 'Limite de 60 requisicoes por minuto excedido' }, {
+      status: 429,
+      headers: { ...erpNoStore, 'Retry-After': '60' }
+    });
+  }
   return { db, empresaId: data!.empresa_id as string, chaveId: data!.id as string };
 }
