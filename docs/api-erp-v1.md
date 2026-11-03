@@ -73,3 +73,7 @@ Os endpoints ainda não foram testados em deploy de Preview e não devem ser con
 4. Em falhas de rede, repetir a confirmação com a mesma referência; o endpoint é idempotente.
 
 A API ainda não foi homologada. Migrações SQL não foram executadas no Supabase de produção.
+
+## Validação de migrações — 2026-11-03
+
+As migrações `erp_api_keys_v1` e `erp_importacoes_v1` foram aplicadas ao projeto Supabase original Frutos de Goias (`efbldnjqmfzxmhipzhux`). Conferência SQL: ambas as tabelas têm RLS ativo, sem SELECT para `anon` e `authenticated`, com SELECT para `service_role`. Teste SQL transacional criou chave temporária, confirmou o mesmo pedido duas vezes com `ON CONFLICT DO NOTHING`, verificou unicidade e executou `ROLLBACK`; contagens finais das duas tabelas: zero. O teste confirma constraints e idempotência em SQL, **não** comprova o funcionamento HTTP ponta a ponta. Deployment Preview do commit anterior `cff4040` está READY; aguardar compilação da revisão de migrações. Ainda faltam testes de autenticação real, controle de acesso entre empresas, limite de requisições e confirmação via endpoint HTTP antes de liberar a main.
