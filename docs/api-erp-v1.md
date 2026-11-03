@@ -1,6 +1,6 @@
 # API ERP v1 — especificação inicial
 
-Status: planejamento; endpoints ainda não implementados. Branch de trabalho `feat/erp-api-v1`.
+Status: autenticação e gerenciamento de chaves implementados na branch de trabalho; migração SQL ainda não aplicada e endpoints de pedidos pendentes. Branch de trabalho `feat/erp-api-v1`.
 
 ## Autenticação
 
@@ -25,3 +25,13 @@ Todas as requisições devem usar HTTPS e `Authorization: Bearer <chave_da_empre
 ## Antes de publicar
 
 Criar migração SQL de credenciais e confirmações; implementar e testar endpoints; validar isolamento Frutos de Goiás / ArtBel; revisar autenticação, CORS, limites e documentação com exemplos; executar testes de regressão e deploy de Preview. Publicar na `main` somente após esses testes.
+
+## Autenticação implementada (não publicada)
+
+- Migração: `supabase/migrations/20261103_erp_api_keys.sql`. Aplicar somente após testes e backup.
+- `GET /api/v1/erp/status`: exige `Authorization: Bearer erp_<64 caracteres hexadecimais>`; responde `{ "ok": true, "api": "erp", "version": "v1" }`.
+- `GET /api/admin/erp-chaves?empresa_id=<uuid>`: lista metadados de chaves; exige JWT de administrador da empresa.
+- `POST /api/admin/erp-chaves?empresa_id=<uuid>`: corpo `{ "nome": "ERP da loja" }`; retorna chave em texto puro uma única vez; exige JWT administrativo.
+- `DELETE /api/admin/erp-chaves?empresa_id=<uuid>&id=<uuid>`: revoga a chave; exige JWT administrativo.
+- A empresa é identificada pelo hash da chave e não por parâmetro fornecido pelo ERP.
+- Não publicar até validar autorização de administradores, rate limiting, proteção de credenciais e testes automatizados.
