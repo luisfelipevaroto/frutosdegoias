@@ -15,5 +15,6 @@ create index if not exists erp_pedidos_importacoes_empresa_data_idx
   on public.erp_pedidos_importacoes (empresa_id, importado_em);
 alter table public.erp_pedidos_importacoes enable row level security;
 revoke all on public.erp_pedidos_importacoes from anon, authenticated;
+grant select, insert, update, delete on public.erp_pedidos_importacoes to service_role;
 comment on table public.erp_pedidos_importacoes is
   'Confirmacao de importacao pelo ERP; nao modifica status de pedido nem pagamento.';
