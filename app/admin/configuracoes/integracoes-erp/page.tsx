@@ -12,6 +12,9 @@ export default function IntegracoesErp() {
   const [chaves, setChaves] = useState<Chave[]>([]);
   const [nome, setNome] = useState("");
   const [token, setToken] = useState("");
+  const [chaveTeste, setChaveTeste] = useState("");
+  const [testando, setTestando] = useState(false);
+  const [resultadoTeste, setResultadoTeste] = useState<{ ok: boolean; texto: string } | null>(null);
   const [erro, setErro] = useState("");
   const [mensagem, setMensagem] = useState("");
   const [carregando, setCarregando] = useState(true);
@@ -71,6 +74,54 @@ export default function IntegracoesErp() {
     finally { setOcupado(false); }
   }
 
+  async function testarApi(e: React.FormEvent) {
+    e.preventDefault();
+    if (testando) return;
+    const chave = chaveTeste.trim();
+    if (!/^erp_[a-f0-9]{64}$/.test(chave)) {
+      setResultadoTeste({ ok: false, texto: "Cole a chave ERP completa que você guardou ao gerar a integração." });
+      return;
+    }
+    setTestando(true); setResultadoTeste(null); setChaveTeste("");
+    const consultar = async (path: string) => {
+      const resposta = await fetch(path, {
+        headers: { Authorization: `Bearer ${chave}` },
+        cache: "no-store", credentials: "same-origin",
+        signal: AbortSignal.timeout(20000)
+      });
+      if (!resposta.headers.get("content-type")?.includes("application/json"))
+        throw new Error("O acesso retornou uma tela de login. Atualize o painel e entre novamente.");
+      const dados = await resposta.json();
+      if (!resposta.ok) {
+        const mensagens: Record<number, string> = {
+          401: "Chave inválida ou revogada.",
+          429: "Limite de chamadas atingido. Aguarde um minuto e tente novamente.",
+          503: "A API não conseguiu acessar o banco. Verifique a configuração do servidor."
+        };
+        throw new Error(`HTTP ${resposta.status}: ${mensagens[resposta.status] || "Não foi possível concluir a consulta."}`);
+      }
+      return dados;
+    };
+    try {
+      const status = await consultar("/api/v1/erp/status");
+      if (status.ok !== true || status.api !== "erp") throw new Error("Resposta de status inesperada.");
+      const pedidos = await consultar("/api/v1/erp/pedidos?limit=1");
+      if (!Array.isArray(pedidos.data)) throw new Error("Resposta de pedidos inesperada.");
+      if (pedidos.data.length) {
+        const id = pedidos.data[0]?.id;
+        if (typeof id !== "string" || !/^[0-9a-f-]{36}$/i.test(id)) throw new Error("Identificador de pedido inesperado.");
+        await consultar(`/api/v1/erp/pedidos/${id}`);
+      }
+      setResultadoTeste({ ok: true, texto: pedidos.data.length
+        ? "Autenticação, listagem e detalhe de pedido responderam com HTTP 200. Nenhum pedido foi alterado."
+        : "Autenticação e listagem responderam com HTTP 200. Esta chave não retornou pedidos; o detalhe não foi testado." });
+    } catch (e) {
+      setResultadoTeste({ ok: false, texto: e instanceof Error && e.name === "TimeoutError"
+        ? "A consulta demorou mais de 20 segundos. Tente novamente."
+        : e instanceof Error ? e.message : "Não foi possível testar a API." });
+    } finally { setTestando(false); }
+  }
+
   async function revogar(id: string) {
     if (!empresa || ocupado) return;
     setOcupado(true); setErro(""); setMensagem("");
@@ -106,6 +157,17 @@ export default function IntegracoesErp() {
           <button type="button" onClick={async () => { try { await navigator.clipboard.writeText(token); setMensagem("Chave copiada."); } catch { setErro("Não foi possível copiar automaticamente."); } }} className="mt-3 rounded border bg-white px-4 py-2 text-sm">Copiar chave</button>
           <button type="button" onClick={() => setToken("")} className="ml-2 mt-3 rounded border px-4 py-2 text-sm">Já guardei, ocultar</button>
         </div>}
+      </section>
+      <section className="rounded-xl border bg-white p-5">
+        <h2 className="mb-3 font-semibold">Testar API</h2>
+        <p className="mb-3 text-sm text-neutral-600">Confira a autenticação e a consulta de pedidos com uma chave existente. O teste somente consulta dados e não confirma importações.</p>
+        <form onSubmit={testarApi} className="flex flex-wrap gap-2">
+          <label htmlFor="chave-teste-erp" className="sr-only">Chave ERP para teste</label>
+          <input id="chave-teste-erp" type="password" autoComplete="off" spellCheck={false} required disabled={testando} value={chaveTeste} onChange={e => setChaveTeste(e.target.value)} placeholder="Cole sua chave ERP" className="min-w-48 flex-1 rounded-lg border p-3 text-sm" />
+          <button disabled={testando || carregando || !empresa || !chaveTeste.trim()} className="rounded-lg bg-brand-700 px-5 py-3 text-sm font-semibold text-white disabled:opacity-50">{testando ? "Testando..." : "Testar conexão e pedidos"}</button>
+        </form>
+        <p className="mt-2 text-xs text-neutral-500">A chave é usada apenas neste teste, sem ser salva no navegador. O campo é limpo ao iniciar.</p>
+        {resultadoTeste && <p role={resultadoTeste.ok ? "status" : "alert"} className={`mt-3 rounded-lg p-3 text-sm ${resultadoTeste.ok ? "bg-green-50 text-green-800" : "bg-red-50 text-red-700"}`}>{resultadoTeste.texto}</p>}
       </section>
       <section className="rounded-xl border bg-white p-5">
         <h2 className="mb-3 font-semibold">Chaves cadastradas</h2>
