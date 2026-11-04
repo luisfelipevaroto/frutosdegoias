@@ -28,7 +28,7 @@ export function dominioAtual() {
   // Mapear apenas os aliases de Preview conhecidos do projeto Frutos de Goias.
   if (
     host === "frutos-de-goias-jf-git-feat-erp-api-v1-luis-felipe13.vercel.app" ||
-    /^frutos-de-goias-[a-z0-9]+-luis-felipe13\\.vercel\\.app$/.test(host)
+    /^frutos-de-goias-[a-z0-9]+-luis-felipe13\.vercel\.app$/.test(host)
   ) return DOMINIO_PADRAO;
   return host;
 }
