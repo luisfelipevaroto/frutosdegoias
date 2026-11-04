@@ -1,12 +1,31 @@
 # Validação ERP — 04/11/2026
 
-- 66 testes automatizados passaram (`node --test tests/*.test.cjs`, a partir da raiz do repositório). Os cinco testes ERP carregam os handlers reais com banco simulado: isolamento nos dois sentidos; primeira confirmação 201; repetição 200; referência divergente 409; dez confirmações concorrentes com um único registro; entradas inválidas; revogação, empresa inativa e limite 429.
-- No PostgreSQL original, transações com rollback verificaram unicidade real de `(empresa_id,pedido_id)`, preservação da data e do pedido. Também foram usados pedidos temporários cancelados, com números negativos explícitos, nas duas empresas. Nenhum registro de teste foi persistido. A ArtBel não tinha pedidos reais.
-- O usuário confirmou HTTP 200 no Preview para autenticação, listagem e detalhe usando uma chave real no painel. Confirmação HTTP e revogação HTTP não foram exercitadas no deployment; a cobertura correspondente é de handlers com mocks e constraints no banco.
-- Produção pública responde sem a barreira de login da Vercel vista no Preview. Revalidar `/api/v1/erp/status` e pedidos após a liberação com uma chave do tenant.
-- O ERP deve manter índice único para o ID externo do pedido em seu próprio banco e confirmar importação somente após a gravação local. A API impede duplicação da confirmação; não controla as transações internas do ERP.
-- Feed paginado acompanha novos pedidos por criação. Mudanças de status exigem reconsulta por ID.
+## Testes automatizados e banco
+
+66 testes automatizados passaram (`node --test tests/*.test.cjs`, a partir da raiz). Incluem isolamento nos dois sentidos, confirmação 201/200, referência divergente 409, dez confirmações concorrentes com um registro, entradas inválidas, chave revogada, empresa inativa e quota 429. No banco original, testes transacionais com rollback verificaram unicidade e preservação do pedido nas duas empresas.
+
+## Homologação HTTP em produção
+
+PR #15 integrado em `611cdf94a282c788688a7972b2003b780188866a`. Deployment de produção `dpl_4GoR4448PePzWDdGZjevAsKXvZN1`, READY. Base pública: https://frutos-de-goias-jf.vercel.app/api/v1/erp.
+
+Foram criadas duas chaves temporárias e dois pedidos temporários cancelados, um por empresa, sem clientes, sem pagamento e sem uso da sequência de números comercial. Os tokens não foram impressos nem publicados. Resultados reais por HTTPS nas duas empresas:
+
+- Status, lista e detalhe: 200.
+- Lista inclui o pedido próprio e exclui o da outra empresa.
+- Leitura e confirmação de pedido estrangeiro: 404 nos dois sentidos.
+- Primeira confirmação: 201.
+- Oito repetições concorrentes após a confirmação: 200, `ja_importado=true`, data preservada.
+- Referência ERP divergente: 409.
+- Banco confirmou exatamente um registro por pedido e status de pedido/pagamento preservados.
+- Ambas as chaves, após revogação no banco: endpoint status retornou 401. O endpoint administrativo de revogação não foi chamado neste teste.
+- Consulta sem chave: 401.
+
+Ao terminar, removidos somente os dois pedidos, suas confirmações e as duas chaves temporárias. Contagens de conferência: zero pedidos, zero importações e zero chaves de teste. O arquivo temporário dos tokens também foi removido. Nenhum pedido real teve status alterado.
+
+## Contrato para o ERP
+
+A confirmação idempotente impede duplicidade do registro na API. O ERP deve manter índice único para o ID externo em seu próprio banco e confirmar somente após a transação local. O feed acompanha criação de pedidos; mudanças de status exigem reconsulta por ID.
 
 ## PagBank
 
-A suíte revelou permissão indevida para cartão online PagBank. Corrigida a regra do servidor e desabilitada a opção no painel; Pix online continua disponível quando configurado. Frutos usa credenciais de teste; ArtBel mantém seu provedor Mercado Pago. Nenhuma cobrança real foi criada nesta validação. A ativação PagBank em produção ainda requer credencial de produção e teste completo de cobrança e confirmação.
+Corrigida permissão indevida para cartão online PagBank; o servidor rejeita o método e o painel desabilita a opção. Pix permanece disponível quando configurado. Frutos está com credenciais de teste, ArtBel mantém Mercado Pago. A ativação real depende da credencial PagBank de produção e do teste de cobrança e confirmação. Nenhuma cobrança real foi criada nesta validação.
