@@ -32,6 +32,23 @@ begin
   return new;
 end $$;
 
+create or replace function public.desconectar_provedor_pagamento(p_empresa_id uuid,p_provedor text)
+returns void language plpgsql security definer set search_path='' as $$
+begin
+  if not public.is_admin_empresa(p_empresa_id) then raise exception 'Sem acesso'; end if;
+  if p_provedor not in('mercado_pago','pagbank') then raise exception 'Provedor inválido'; end if;
+  perform 1 from public.empresas where id=p_empresa_id for update;
+  update public.integracoes_credenciais set pagamento_conectado=false,atualizado_em=now()
+    where empresa_id=p_empresa_id and provedor=p_provedor;
+  update public.integracoes_empresa set ativo=false
+    where empresa_id=p_empresa_id and tipo='pagamento' and provedor=p_provedor;
+  update public.configuracoes_loja
+    set valor=valor||'{"online":false,"pix_online":false,"cartao_online":false}'::jsonb,atualizado_em=now()
+    where empresa_id=p_empresa_id and chave='pagamentos';
+end $$;
+revoke all on function public.desconectar_provedor_pagamento(uuid,text) from public,anon;
+grant execute on function public.desconectar_provedor_pagamento(uuid,text) to authenticated;
+
 create or replace function public.validar_configuracao_entrega()
 returns trigger language plpgsql security invoker set search_path='' as $$
 declare inicio text; fim text; minimo numeric;
