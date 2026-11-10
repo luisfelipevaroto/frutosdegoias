@@ -1,9 +1,8 @@
 "use client";
-import ProducaoLoja from "./ProducaoLoja";
+import InformacoesLoja from "./InformacoesLoja";
 import Image from "next/image";
 import Link from "next/link";
 import { CSSProperties, useEffect, useState } from "react";
-import StatusLoja from "./StatusLoja";
 import { Empresa, getEmpresaAtual } from "@/lib/empresa";
 interface Props {
   busca: string;
@@ -148,14 +147,10 @@ export default function LojaHeader({
             <div className="shrink-0 md:hidden">
               {pedidos && <CarrinhoIcone quantidade={quantidadeCarrinho} />}
             </div>
-            <div className="hidden shrink-0 md:block">
-              <StatusLoja />
-            </div>
           </div>
-          <div className="mt-2 md:hidden">
-            <StatusLoja />
+          <div className="mt-2">
+            <InformacoesLoja empresa={empresa} />
           </div>
-          <ProducaoLoja />
         </div>
       </div>
       <div className="mx-auto max-w-6xl px-4 pb-3 md:px-6">
@@ -175,8 +170,8 @@ export default function LojaHeader({
         </label>
       </div>
       {mostrarFixo && (
-        <div className="fixed inset-x-0 top-0 z-50 border-b border-neutral-200 bg-white/95 shadow-md backdrop-blur md:hidden">
-          <div className="mx-auto flex h-[68px] max-w-6xl items-center gap-3 px-4">
+        <div className="fixed inset-x-0 top-0 z-50 border-b border-neutral-200 bg-white shadow-md md:hidden">
+          <div className="mx-auto flex min-h-[76px] py-2 max-w-6xl items-center gap-3 px-4">
             <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-full border border-neutral-200 bg-white">
               <Logo url={empresa?.logo_url} nome={nome} compacto />
             </div>
@@ -185,7 +180,7 @@ export default function LojaHeader({
                 {nome}
               </p>
               <div className="mt-0.5">
-                <StatusLoja />
+                <InformacoesLoja empresa={empresa} />
               </div>
             </div>
             {pedidos && <CarrinhoIcone quantidade={quantidadeCarrinho} />}
