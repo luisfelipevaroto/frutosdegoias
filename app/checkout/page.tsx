@@ -1,20 +1,843 @@
 "use client";
-import {chavePedidoCliente,concluirSolicitacaoPedido} from '@/lib/solicitacao-pedido';
+import ProducaoLoja from "@/components/ProducaoLoja";
+import { freteGratisAplicavel, normalizarEntrega } from "@/lib/regras-entrega";
+import {
+  chavePedidoCliente,
+  concluirSolicitacaoPedido,
+} from "@/lib/solicitacao-pedido";
 
-import {useEffect,useState} from "react";import Link from "next/link";import {useRouter} from "next/navigation";import {useCarrinho} from "@/lib/carrinho-context";import {FormaPagamento,TipoEntrega} from "@/lib/types";import {supabase} from "@/lib/supabase";import {getEmpresaAtual,Empresa} from "@/lib/empresa";
-import{normalizarPagamentos,provedorDisponivel}from'@/lib/pagamentos';const KEY="delivery_cliente";
-type PagCfg={dinheiro?:boolean;cartao_entrega?:boolean;cartao_online?:boolean;pix_online?:boolean;online?:boolean};type EntCfg={retirada?:boolean;propria?:boolean;taxa?:number;pedido_minimo?:number;raio_km?:number;uber_direct?:boolean;ifood?:boolean;entrega_99?:boolean};type Cliente={nome:string;cpf:string;whatsapp:string;endereco:string};type Fid={ativo:boolean;saldo:number;cupom_disponivel:boolean;meta?:number;desconto_percentual?:number;tipo_recompensa?:"percentual"|"fixo";valor_recompensa?:number};type End={cep:string;logradouro:string;numero:string;complemento:string;bairro:string;cidade:string;estado:string;validado:boolean;distanciaKm?:number|null};type Metodo="pix_online"|"cartao_online"|FormaPagamento;type UberQuote={quoteId:string;valor:number;duracaoMinutos?:number|null;expiraEm?:string|null};
-export default function Checkout(){const router=useRouter(),{itens,subtotal,limpar}=useCarrinho();const[empresa,setEmpresa]=useState<Empresa|null>(null),[cliente,setCliente]=useState<Cliente|null>(null),[cadastro,setCadastro]=useState({nome:"",cpf:"",whatsapp:""}),[tipo,setTipo]=useState<TipoEntrega>("entrega"),[metodo,setMetodo]=useState<Metodo>("dinheiro"),[pagCfg,setPagCfg]=useState<PagCfg>({}),[entCfg,setEntCfg]=useState<EntCfg>({}),[online,setOnline]=useState(false),[provedorOnline,setProvedorOnline]=useState<string|null>(null),[fid,setFid]=useState<Fid|null>(null),[usarFid,setUsarFid]=useState(false),[observacoes,setObservacoes]=useState(""),[precisaTroco,setPrecisaTroco]=useState(false),[trocoPara,setTrocoPara]=useState(""),[email,setEmail]=useState(""),[end,setEnd]=useState<End>({cep:"",logradouro:"",numero:"",complemento:"",bairro:"",cidade:"",estado:"",validado:false}),[buscandoCep,setBuscandoCep]=useState(false),[enviando,setEnviando]=useState(false),[erro,setErro]=useState(""),[configCarregada,setConfigCarregada]=useState(false),[pix,setPix]=useState<any>(null),[uberQuote,setUberQuote]=useState<UberQuote|null>(null),[cotandoUber,setCotandoUber]=useState(false);
-useEffect(()=>{getEmpresaAtual().then(async e=>{setEmpresa(e);if(!e)return;const[{data:pc,error:pcErro},{data:ec},{data:op,error:opErro}]=await Promise.all([supabase.from("configuracoes_loja").select("valor").eq("empresa_id",e.id).eq("chave","pagamentos").maybeSingle(),supabase.from("configuracoes_loja").select("valor").eq("empresa_id",e.id).eq("chave","entrega").maybeSingle(),supabase.rpc("status_pagamento_online",{p_empresa_id:e.id})]);if(pcErro||opErro)setErro('Não foi possível carregar todas as formas de pagamento. Atualize a página.');const p=normalizarPagamentos(pc?.valor),ent=(ec?.valor||{}) as EntCfg,provider=provedorDisponivel(op??[]),mp=!!provider;setProvedorOnline(provider);setPagCfg(p);setEntCfg(ent);setOnline(!!p.online&&mp);const temEntrega=!!(ent.propria||ent.uber_direct||ent.ifood||ent.entrega_99);setTipo(temEntrega?"entrega":ent.retirada!==false?"retirada":"entrega");if(p.pix_online&&mp)setMetodo("pix_online");else if(p.cartao_online&&provider==="mercado_pago")setMetodo("cartao_online");else if(p.cartao_entrega)setMetodo("cartao");else if(p.dinheiro)setMetodo("dinheiro");setConfigCarregada(true);try{const s=localStorage.getItem(KEY);if(s){const cl=JSON.parse(s) as Cliente;setCliente(cl);const{data}=await supabase.rpc("consultar_fidelidade",{p_empresa_id:e.id,p_cpf:cl.cpf,p_whatsapp:cl.whatsapp});if(data)setFid(data as Fid)}}catch{}})},[]);
-const temEntrega=!!(entCfg.propria||entCfg.uber_direct||entCfg.ifood||entCfg.entrega_99),temRetirada=entCfg.retirada!==false,formas:Metodo[]=[...(online&&provedorOnline==="mercado_pago"&&pagCfg.cartao_online?["cartao_online" as Metodo]:[]),...(online&&pagCfg.pix_online?["pix_online" as Metodo]:[]),...(pagCfg.cartao_entrega?["cartao" as Metodo]:[]),...(pagCfg.dinheiro?["dinheiro" as Metodo]:[])],pedidoMinimo=Number(entCfg.pedido_minimo||0),taxa=tipo==="entrega"&&end.validado?(entCfg.uber_direct?Number(uberQuote?.valor||0):Number(entCfg.taxa||0)):0,recompensa=Number(fid?.valor_recompensa??fid?.desconto_percentual??10),tipoRec=fid?.tipo_recompensa??"percentual",desconto=usarFid&&fid?.ativo&&fid.cupom_disponivel?(tipoRec==="fixo"?Math.min(subtotal,recompensa):subtotal*recompensa/100):0,total=subtotal-desconto+taxa;
-function enderecoCompleto(){return `${end.logradouro}, ${end.numero}${end.complemento?", "+end.complemento:""} - ${end.bairro}, ${end.cidade}/${end.estado} - CEP ${end.cep}`}
-async function validarCep(){if(!empresa)return;const cep=end.cep.replace(/\D/g,"");if(cep.length!==8)return setErro("Informe um CEP com 8 dígitos.");setBuscandoCep(true);setErro("");setUberQuote(null);const r=await fetch("/api/entrega/validar",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({empresaId:empresa.id,cep})}),d=await r.json();setBuscandoCep(false);if(!r.ok){setEnd(x=>({...x,validado:false}));return setErro(d.error||"CEP não atendido.")}if(!d.valido){setEnd(x=>({...x,validado:false}));return setErro(`Este endereço está a ${d.distanciaKm} km da loja e ultrapassa o raio de ${d.raioKm} km.`)}setEnd(x=>({...x,...d.endereco,cep:d.endereco.cep||cep,validado:true,distanciaKm:d.distanciaKm}))}
-async function cotarUber(){if(!empresa||!end.validado||!end.numero.trim())return setErro("Informe o número do endereço antes de calcular o Uber envio.");setCotandoUber(true);setErro("");setUberQuote(null);const r=await fetch("/api/entrega/uber-direct/cotacao",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({empresaId:empresa.id,endereco:enderecoCompleto()})}),d=await r.json();setCotandoUber(false);if(!r.ok)return setErro(d.error||"Não foi possível calcular o Uber envio.");setUberQuote(d)}
-async function garantirCliente(){if(cliente)return cliente;if(!empresa)return null;const nome=cadastro.nome.trim(),cpf=cadastro.cpf.replace(/\D/g,""),whatsapp=cadastro.whatsapp.replace(/\D/g,"");if(!nome)return setErro("Informe seu nome."),null;if(cpf.length!==11)return setErro("Informe um CPF com 11 dígitos."),null;if(whatsapp.length<10)return setErro("Informe o WhatsApp com DDD."),null;const novo={nome,cpf,whatsapp,endereco:tipo==="entrega"?enderecoCompleto():""};const{error}=await supabase.rpc("cadastrar_cliente",{p_empresa_id:empresa.id,p_nome:nome,p_cpf:cpf,p_whatsapp:whatsapp,p_endereco:novo.endereco||null});if(error)return setErro(error.message),null;setCliente(novo);localStorage.setItem(KEY,JSON.stringify(novo));return novo}
-async function confirmar(){if(!empresa)return setErro("Empresa não identificada.");if(!configCarregada)return setErro("Aguarde as configurações.");if(tipo==="entrega"&&(!end.validado||!end.numero.trim()))return setErro("Valide o CEP e informe o número do endereço.");if(tipo==="entrega"&&entCfg.uber_direct&&!uberQuote)return setErro("Calcule o Uber envio antes de confirmar o pedido.");if(uberQuote?.expiraEm&&new Date(uberQuote.expiraEm).getTime()<=Date.now())return setErro("A cotação do Uber envio expirou. Calcule novamente.");if(subtotal<pedidoMinimo)return setErro(`O pedido mínimo é R$ ${pedidoMinimo.toFixed(2)}.`);if(!formas.includes(metodo))return setErro("Selecione uma forma de pagamento.");if(metodo==="pix_online"&&!/^\S+@\S+\.\S+$/.test(email))return setErro("Informe um e-mail válido para gerar o PIX.");if(metodo==="dinheiro"&&precisaTroco&&Number(trocoPara)<=total)return setErro("O valor para troco precisa ser maior que o total do pedido.");const cl=await garantirCliente();if(!cl)return;setEnviando(true);setErro("");const pagamento:FormaPagamento=metodo==="pix_online"?"pix":metodo==="cartao_online"?"cartao":metodo;const pedidoBody:any={empresaId:empresa.id,cliente:{nome:cl.nome,cpf:cl.cpf,telefone:cl.whatsapp,whatsapp:cl.whatsapp},tipoEntrega:tipo,endereco:tipo==="entrega"?enderecoCompleto():null,cepEntrega:tipo==="entrega"?end.cep:null,taxaEntrega:taxa,provedorEntrega:tipo==="entrega"&&entCfg.uber_direct?"uber_direct":null,quoteId:uberQuote?.quoteId||null,pagamento,pagamentoOnline:metodo==="pix_online"||metodo==="cartao_online",observacoes,precisaTroco:metodo==="dinheiro"&&precisaTroco,trocoPara:metodo==="dinheiro"&&precisaTroco?Number(trocoPara):null,itens,usarFidelidade:usarFid};pedidoBody.chaveSolicitacao=await chavePedidoCliente(empresa.id,pedidoBody);const r=await fetch("/api/pedidos",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(pedidoBody)}),d=await r.json();if(!r.ok){setEnviando(false);return setErro(d.error||"Não foi possível criar o pedido.")}if(d.recuperado){setEnviando(false);concluirSolicitacaoPedido(empresa!.id);limpar();router.push(`/pedido/${d.numero}`);return;}if(metodo==='cartao_online'&&d.provedor_pagamento==='pagbank'){setEnviando(false);return setErro('Cartão PagBank ainda não disponível. Selecione PIX online.')}if(metodo==='cartao_online'){const cr=await fetch('/api/pagamentos/mercado-pago',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pedidoId:d.id})}),cd=await cr.json();setEnviando(false);if(!cr.ok||!cd.url)return setErro(cd.error||'Pedido criado, mas não foi possível iniciar o cartão online.');concluirSolicitacaoPedido(empresa!.id);limpar();window.location.assign(cd.url);return}if(metodo==="pix_online"){const pr=await fetch(d.provedor_pagamento==="pagbank"?"/api/pagamentos/pagbank/pix":"/api/pagamentos/mercado-pago/pix",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({pedidoId:d.id,email,cpf:cl.cpf})}),pd=await pr.json();setEnviando(false);if(!pr.ok)return setErro(pd.error||"Pedido criado, mas não foi possível gerar o PIX.");setPix({...pd,numero:d.numero});concluirSolicitacaoPedido(empresa!.id);limpar();return}setEnviando(false);concluirSolicitacaoPedido(empresa!.id);limpar();router.push(`/pedido/${d.numero}`)}
-if(pix)return <main className="mx-auto max-w-md p-5"><h1 className="text-xl font-bold">Pedido #{pix.numero}</h1><div className="mt-4 rounded-2xl border bg-white p-5 text-center"><h2 className="font-bold">Pague com PIX</h2><p className="mt-1 text-sm text-neutral-500">Pagamento em ambiente {pix.ambiente==="teste"?"de teste":"de produção"}.</p>{pix.qrCodeBase64&&<img alt="QR Code PIX" className="mx-auto mt-4 w-56" src={pix.qrCodeBase64.startsWith("data:")?pix.qrCodeBase64:`data:image/png;base64,${pix.qrCodeBase64}`}/>} {pix.qrCode&&<><textarea readOnly value={pix.qrCode} className="mt-4 h-24 w-full rounded-lg border p-2 text-xs"/><button onClick={()=>navigator.clipboard.writeText(pix.qrCode)} className="mt-2 w-full rounded-lg bg-brand-700 py-3 text-sm font-bold text-white">Copiar código PIX</button></>}{pix.ticketUrl&&<a href={pix.ticketUrl} target="_blank" rel="noreferrer" className="mt-3 block text-sm text-brand-700 underline">Abrir instruções do PIX</a>}</div><Link href={`/pedido/${pix.numero}`} className="mt-4 block text-center text-sm text-brand-700">Acompanhar pedido</Link></main>;
-return <main className="mx-auto max-w-md p-4 pb-24"><h1 className="mb-4 text-lg font-bold">Finalizar pedido</h1>{!cliente?<section className="mb-4 rounded-xl border bg-white p-4"><h2 className="font-semibold">Seus dados</h2><div className="mt-3 grid gap-2"><input value={cadastro.nome} onChange={e=>setCadastro({...cadastro,nome:e.target.value})} placeholder="Nome completo" className="rounded-lg border px-3 py-2"/><input value={cadastro.cpf} onChange={e=>setCadastro({...cadastro,cpf:e.target.value})} inputMode="numeric" placeholder="CPF" className="rounded-lg border px-3 py-2"/><input value={cadastro.whatsapp} onChange={e=>setCadastro({...cadastro,whatsapp:e.target.value})} inputMode="tel" placeholder="WhatsApp com DDD" className="rounded-lg border px-3 py-2"/></div></section>:<div className="mb-4 rounded-xl border bg-white p-3"><b>{cliente.nome}</b><p className="text-xs text-neutral-500">{cliente.whatsapp}</p><Link href="/cadastro" className="text-xs text-brand-700">Editar cadastro</Link></div>}
-<div className="mb-4 flex gap-2">{temEntrega&&<button onClick={()=>setTipo("entrega")} className={`flex-1 rounded-lg border py-3 ${tipo==="entrega"?"border-brand-600 bg-brand-50 text-brand-700":""}`}>Entrega</button>}{temRetirada&&<button onClick={()=>setTipo("retirada")} className={`flex-1 rounded-lg border py-3 ${tipo==="retirada"?"border-brand-600 bg-brand-50 text-brand-700":""}`}>Retirada</button>}</div>
-{tipo==="entrega"&&<section className="mb-4 rounded-xl border bg-white p-4"><h2 className="font-semibold">Endereço de entrega</h2><div className="mt-3 flex gap-2"><input value={end.cep} onChange={e=>{setEnd({...end,cep:e.target.value,validado:false});setUberQuote(null)}} inputMode="numeric" placeholder="CEP" className="min-w-0 flex-1 rounded-lg border px-3 py-2"/><button onClick={validarCep} disabled={buscandoCep} className="rounded-lg bg-neutral-900 px-4 text-sm font-semibold text-white">{buscandoCep?"Buscando...":"Buscar"}</button></div>{end.validado&&<div className="mt-3 grid gap-2"><input value={end.logradouro} onChange={e=>{setEnd({...end,logradouro:e.target.value});setUberQuote(null)}} placeholder="Rua" className="rounded-lg border px-3 py-2"/><div className="grid grid-cols-2 gap-2"><input value={end.numero} onChange={e=>{setEnd({...end,numero:e.target.value});setUberQuote(null)}} placeholder="Número" className="rounded-lg border px-3 py-2"/><input value={end.complemento} onChange={e=>{setEnd({...end,complemento:e.target.value});setUberQuote(null)}} placeholder="Complemento" className="rounded-lg border px-3 py-2"/></div><input value={end.bairro} onChange={e=>{setEnd({...end,bairro:e.target.value});setUberQuote(null)}} placeholder="Bairro" className="rounded-lg border px-3 py-2"/><div className="grid grid-cols-2 gap-2"><input value={end.cidade} readOnly className="rounded-lg border bg-neutral-50 px-3 py-2"/><input value={end.estado} readOnly className="rounded-lg border bg-neutral-50 px-3 py-2"/></div>{end.distanciaKm!=null&&<p className="text-xs text-green-700">Endereço dentro da área de entrega · aprox. {end.distanciaKm} km</p>}{entCfg.uber_direct&&<div className="mt-2 rounded-xl border bg-neutral-50 p-3">{uberQuote?<div className="flex items-center justify-between"><div><b className="text-sm">Uber envio</b><p className="text-xs text-neutral-500">{uberQuote.duracaoMinutos?`Estimativa: ${uberQuote.duracaoMinutos} min`:"Cotação disponível"}</p></div><b>R$ {uberQuote.valor.toFixed(2)}</b></div>:<button type="button" onClick={cotarUber} disabled={cotandoUber||!end.numero.trim()} className="w-full rounded-lg bg-brand-700 py-2.5 text-sm font-bold text-white disabled:opacity-40">{cotandoUber?"Calculando Uber envio...":"Calcular Uber envio"}</button>}</div>}</div>}</section>}
-<label className="mb-1 block text-xs text-neutral-500">Forma de pagamento</label><div className="mb-4 grid grid-cols-2 gap-2">{formas.map(f=><button key={f} onClick={()=>setMetodo(f)} className={`rounded-lg border py-3 text-sm ${metodo===f?"border-brand-600 bg-brand-50 text-brand-700":""}`}>{f==="pix_online"?"Pix (online)":f==="cartao_online"?"Cartão de crédito (online)":f==="cartao"?"Cartão na entrega":"Dinheiro"}</button>)}</div>{metodo==="pix_online"&&<div className="mb-4"><label className="mb-1 block text-xs text-neutral-500">E-mail para o pagamento</label><input type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="seu@email.com" className="w-full rounded-lg border px-3 py-2"/></div>}{metodo==="dinheiro"&&<div className="mb-4 rounded-xl border bg-white p-4"><p className="text-sm font-semibold">Precisa de troco?</p><div className="mt-2 flex gap-2"><button type="button" onClick={()=>setPrecisaTroco(false)} className={`flex-1 rounded-lg border py-2 text-sm ${!precisaTroco?"border-brand-600 bg-brand-50 text-brand-700":""}`}>Não</button><button type="button" onClick={()=>setPrecisaTroco(true)} className={`flex-1 rounded-lg border py-2 text-sm ${precisaTroco?"border-brand-600 bg-brand-50 text-brand-700":""}`}>Sim</button></div>{precisaTroco&&<div className="mt-3"><label className="mb-1 block text-xs text-neutral-500">Troco para quanto?</label><div className="flex items-center rounded-lg border px-3"><span className="text-sm text-neutral-500">R$</span><input type="number" min="0" step=".01" value={trocoPara} onChange={e=>setTrocoPara(e.target.value)} placeholder="50,00" className="w-full px-2 py-2 outline-none"/></div></div>}</div>}<div className="mb-4"><label className="mb-1 block text-xs text-neutral-500">Observações do pedido <span className="text-neutral-400">(opcional)</span></label><textarea maxLength={500} value={observacoes} onChange={e=>setObservacoes(e.target.value)} placeholder="Ex.: retirar cebola, tocar o interfone, ponto da carne..." className="min-h-20 w-full rounded-lg border px-3 py-2 text-sm"/><p className="mt-1 text-right text-[11px] text-neutral-400">{observacoes.length}/500</p></div>
-{fid?.ativo&&fid.cupom_disponivel&&<label className="mb-4 flex gap-2 rounded-lg border p-3 text-sm"><input type="checkbox" checked={usarFid} onChange={e=>setUsarFid(e.target.checked)}/> Usar recompensa de fidelidade</label>}<div className="border-t pt-3 text-sm"><div className="flex justify-between"><span>Subtotal</span><span>R$ {subtotal.toFixed(2)}</span></div>{desconto>0&&<div className="flex justify-between text-green-700"><span>Fidelidade</span><span>- R$ {desconto.toFixed(2)}</span></div>}{taxa>0&&<div className="flex justify-between"><span>{entCfg.uber_direct?"Uber envio":"Taxa de entrega"}</span><span>R$ {taxa.toFixed(2)}</span></div>}<div className="mt-2 flex justify-between text-lg font-bold"><span>Total</span><span>R$ {total.toFixed(2)}</span></div></div>{erro&&<p className="mt-3 rounded-lg bg-red-50 p-3 text-sm text-red-700">{erro}</p>}<button onClick={confirmar} disabled={!itens.length||enviando||!configCarregada||formas.length===0||(tipo==="entrega"&&entCfg.uber_direct&&!uberQuote)} className="mt-4 w-full rounded-lg bg-brand-700 py-3 font-semibold text-white disabled:opacity-40">{enviando?"Processando...":metodo==="pix_online"?"Ir para pagamento Pix":metodo==="cartao_online"?"Pagar com cartão de crédito":"Confirmar pedido"}</button></main>}
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useCarrinho } from "@/lib/carrinho-context";
+import { FormaPagamento, TipoEntrega } from "@/lib/types";
+import { supabase } from "@/lib/supabase";
+import { getEmpresaAtual, Empresa } from "@/lib/empresa";
+import { normalizarPagamentos, provedorDisponivel } from "@/lib/pagamentos";
+const KEY = "delivery_cliente";
+type PagCfg = {
+  dinheiro?: boolean;
+  cartao_entrega?: boolean;
+  cartao_retirada?: boolean;
+  pix_manual?: boolean;
+  cartao_online?: boolean;
+  pix_online?: boolean;
+  online?: boolean;
+};
+type EntCfg = {
+  retirada?: boolean;
+  integrada?: boolean;
+  propria?: boolean;
+  taxa?: number;
+  cep_inicio?: string;
+  cep_fim?: string;
+  frete_gratis_ativo?: boolean;
+  frete_gratis_minimo?: number;
+  uber_direct?: boolean;
+  ifood?: boolean;
+  entrega_99?: boolean;
+};
+type Cliente = {
+  nome: string;
+  cpf: string;
+  whatsapp: string;
+  endereco: string;
+};
+type Fid = {
+  ativo: boolean;
+  saldo: number;
+  cupom_disponivel: boolean;
+  meta?: number;
+  desconto_percentual?: number;
+  tipo_recompensa?: "percentual" | "fixo";
+  valor_recompensa?: number;
+};
+type End = {
+  cep: string;
+  logradouro: string;
+  numero: string;
+  complemento: string;
+  bairro: string;
+  cidade: string;
+  estado: string;
+  validado: boolean;
+  distanciaKm?: number | null;
+};
+type Metodo = "pix_online" | "cartao_online" | FormaPagamento;
+type UberQuote = {
+  quoteId: string;
+  valor: number;
+  duracaoMinutos?: number | null;
+  expiraEm?: string | null;
+};
+export default function Checkout() {
+  const router = useRouter(),
+    { itens, subtotal, limpar } = useCarrinho();
+  const [moduloFreteGratis, setModuloFreteGratis] = useState(false),
+    [empresa, setEmpresa] = useState<Empresa | null>(null),
+    [cliente, setCliente] = useState<Cliente | null>(null),
+    [cadastro, setCadastro] = useState({ nome: "", cpf: "", whatsapp: "" }),
+    [tipo, setTipo] = useState<TipoEntrega>("entrega"),
+    [metodo, setMetodo] = useState<Metodo>("dinheiro"),
+    [pagCfg, setPagCfg] = useState<PagCfg>({}),
+    [entCfg, setEntCfg] = useState<EntCfg>({}),
+    [online, setOnline] = useState(false),
+    [provedorOnline, setProvedorOnline] = useState<string | null>(null),
+    [fid, setFid] = useState<Fid | null>(null),
+    [usarFid, setUsarFid] = useState(false),
+    [observacoes, setObservacoes] = useState(""),
+    [precisaTroco, setPrecisaTroco] = useState(false),
+    [trocoPara, setTrocoPara] = useState(""),
+    [email, setEmail] = useState(""),
+    [end, setEnd] = useState<End>({
+      cep: "",
+      logradouro: "",
+      numero: "",
+      complemento: "",
+      bairro: "",
+      cidade: "",
+      estado: "",
+      validado: false,
+    }),
+    [buscandoCep, setBuscandoCep] = useState(false),
+    [enviando, setEnviando] = useState(false),
+    [erro, setErro] = useState(""),
+    [configCarregada, setConfigCarregada] = useState(false),
+    [pix, setPix] = useState<any>(null),
+    [uberQuote, setUberQuote] = useState<UberQuote | null>(null),
+    [cotandoUber, setCotandoUber] = useState(false);
+  useEffect(() => {
+    getEmpresaAtual().then(async (e) => {
+      setEmpresa(e);
+      if (!e) return;
+      const [
+        { data: pc, error: pcErro },
+        { data: ec },
+        { data: op, error: opErro },
+        { data: fg, error: fgErro },
+      ] = await Promise.all([
+        supabase
+          .from("configuracoes_loja")
+          .select("valor")
+          .eq("empresa_id", e.id)
+          .eq("chave", "pagamentos")
+          .maybeSingle(),
+        supabase
+          .from("configuracoes_loja")
+          .select("valor")
+          .eq("empresa_id", e.id)
+          .eq("chave", "entrega")
+          .maybeSingle(),
+        supabase.rpc("status_pagamento_online", { p_empresa_id: e.id }),
+        supabase.rpc("modulo_empresa_ativo", {
+          p_empresa_id: e.id,
+          p_chave: "frete_gratis",
+        }),
+      ]);
+      if (pcErro || opErro)
+        setErro(
+          "Não foi possível carregar todas as formas de pagamento. Atualize a página.",
+        );
+      const p = normalizarPagamentos(pc?.valor),
+        ent = normalizarEntrega(ec?.valor || {}) as EntCfg,
+        provider = provedorDisponivel(op ?? []),
+        mp = !!provider;
+      setModuloFreteGratis(!fgErro && fg === true);
+      setProvedorOnline(provider);
+      setPagCfg(p);
+      setEntCfg(ent);
+      setOnline(!!p.online && mp);
+      const temEntrega = !!(
+        ent.propria ||
+        ent.uber_direct ||
+        ent.ifood ||
+        ent.entrega_99
+      );
+      setTipo(
+        temEntrega
+          ? "entrega"
+          : ent.retirada !== false
+            ? "retirada"
+            : "entrega",
+      );
+      if (p.pix_online && mp) setMetodo("pix_online");
+      else if (p.cartao_online && provider === "mercado_pago")
+        setMetodo("cartao_online");
+      else if (p.cartao_entrega) setMetodo("cartao");
+      else if (p.dinheiro) setMetodo("dinheiro");
+      setConfigCarregada(true);
+      try {
+        const s = localStorage.getItem(KEY);
+        if (s) {
+          const cl = JSON.parse(s) as Cliente;
+          setCliente(cl);
+          const { data } = await supabase.rpc("consultar_fidelidade", {
+            p_empresa_id: e.id,
+            p_cpf: cl.cpf,
+            p_whatsapp: cl.whatsapp,
+          });
+          if (data) setFid(data as Fid);
+        }
+      } catch {}
+    });
+  }, []);
+  const temEntrega = !!(
+    entCfg.propria ||
+    entCfg.uber_direct ||
+    entCfg.ifood ||
+    entCfg.entrega_99
+  );
+  const temRetirada = entCfg.retirada !== false;
+  const formas: Metodo[] = [
+    ...(online && provedorOnline === "mercado_pago" && pagCfg.cartao_online
+      ? ["cartao_online" as Metodo]
+      : []),
+    ...(online && pagCfg.pix_online ? ["pix_online" as Metodo] : []),
+    ...((tipo === "retirada" ? pagCfg.cartao_retirada : pagCfg.cartao_entrega)
+      ? ["cartao" as Metodo]
+      : []),
+    ...(tipo === "retirada" && pagCfg.pix_manual ? ["pix" as Metodo] : []),
+    ...(pagCfg.dinheiro ? ["dinheiro" as Metodo] : []),
+  ];
+  const recompensa = Number(
+    fid?.valor_recompensa ?? fid?.desconto_percentual ?? 10,
+  );
+  const tipoRec = fid?.tipo_recompensa ?? "percentual";
+  const desconto =
+    usarFid && fid?.ativo && fid.cupom_disponivel
+      ? Math.round(
+          (tipoRec === "fixo"
+            ? Math.min(subtotal, recompensa)
+            : (subtotal * recompensa) / 100) * 100,
+        ) / 100
+      : 0;
+  const freteGratis =
+    tipo === "entrega" &&
+    freteGratisAplicavel(entCfg, moduloFreteGratis, subtotal - desconto);
+  const taxaOriginal =
+    tipo === "entrega" && end.validado
+      ? entCfg.uber_direct
+        ? Number(uberQuote?.valor || 0)
+        : Number(entCfg.taxa || 0)
+      : 0;
+  const taxa = freteGratis ? 0 : taxaOriginal;
+  const total = Math.round((subtotal - desconto + taxa) * 100) / 100;
+  const chaveFormas = formas.join(",");
+  useEffect(() => {
+    if (configCarregada && !formas.includes(metodo))
+      setMetodo(formas[0] ?? "dinheiro");
+  }, [chaveFormas, configCarregada, metodo]);
+  function enderecoCompleto() {
+    return `${end.logradouro}, ${end.numero}${end.complemento ? ", " + end.complemento : ""} - ${end.bairro}, ${end.cidade}/${end.estado} - CEP ${end.cep}`;
+  }
+  async function validarCep() {
+    if (!empresa) return;
+    const cep = end.cep.replace(/\D/g, "");
+    if (cep.length !== 8) return setErro("Informe um CEP com 8 dígitos.");
+    setBuscandoCep(true);
+    setErro("");
+    setUberQuote(null);
+    const r = await fetch("/api/entrega/validar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ empresaId: empresa.id, cep }),
+      }),
+      d = await r.json();
+    setBuscandoCep(false);
+    if (!r.ok) {
+      setEnd((x) => ({ ...x, validado: false }));
+      return setErro(d.error || "CEP não atendido.");
+    }
+    if (!d.valido) {
+      setEnd((x) => ({ ...x, validado: false }));
+      return setErro(d.error || "CEP fora da faixa de entrega da loja.");
+    }
+    setEnd((x) =>
+      x.cep.replace(/\D/g, "") !== cep
+        ? { ...x, validado: false }
+        : {
+            ...x,
+            ...d.endereco,
+            cep: d.endereco.cep || cep,
+            validado: true,
+            distanciaKm: d.distanciaKm,
+          },
+    );
+  }
+  async function cotarUber() {
+    if (!empresa || !end.validado || !end.numero.trim())
+      return setErro(
+        "Informe o número do endereço antes de calcular o Uber envio.",
+      );
+    setCotandoUber(true);
+    setErro("");
+    setUberQuote(null);
+    const r = await fetch("/api/entrega/uber-direct/cotacao", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          empresaId: empresa.id,
+          endereco: enderecoCompleto(),
+        }),
+      }),
+      d = await r.json();
+    setCotandoUber(false);
+    if (!r.ok)
+      return setErro(d.error || "Não foi possível calcular o Uber envio.");
+    setUberQuote(d);
+  }
+  async function garantirCliente() {
+    if (cliente) return cliente;
+    if (!empresa) return null;
+    const nome = cadastro.nome.trim(),
+      cpf = cadastro.cpf.replace(/\D/g, ""),
+      whatsapp = cadastro.whatsapp.replace(/\D/g, "");
+    if (!nome) return setErro("Informe seu nome."), null;
+    if (cpf.length !== 11)
+      return setErro("Informe um CPF com 11 dígitos."), null;
+    if (whatsapp.length < 10)
+      return setErro("Informe o WhatsApp com DDD."), null;
+    const novo = {
+      nome,
+      cpf,
+      whatsapp,
+      endereco: tipo === "entrega" ? enderecoCompleto() : "",
+    };
+    const { error } = await supabase.rpc("cadastrar_cliente", {
+      p_empresa_id: empresa.id,
+      p_nome: nome,
+      p_cpf: cpf,
+      p_whatsapp: whatsapp,
+      p_endereco: novo.endereco || null,
+    });
+    if (error) return setErro(error.message), null;
+    setCliente(novo);
+    localStorage.setItem(KEY, JSON.stringify(novo));
+    return novo;
+  }
+  async function confirmar() {
+    if (!empresa) return setErro("Empresa não identificada.");
+    if (!configCarregada) return setErro("Aguarde as configurações.");
+    if (tipo === "entrega" && (!end.validado || !end.numero.trim()))
+      return setErro("Valide o CEP e informe o número do endereço.");
+    if (tipo === "entrega" && entCfg.uber_direct && !uberQuote)
+      return setErro("Calcule o Uber envio antes de confirmar o pedido.");
+    if (
+      uberQuote?.expiraEm &&
+      new Date(uberQuote.expiraEm).getTime() <= Date.now()
+    )
+      return setErro("A cotação do Uber envio expirou. Calcule novamente.");
+    if (!formas.includes(metodo))
+      return setErro("Selecione uma forma de pagamento.");
+    if (metodo === "pix_online" && !/^\S+@\S+\.\S+$/.test(email))
+      return setErro("Informe um e-mail válido para gerar o PIX.");
+    if (metodo === "dinheiro" && precisaTroco && Number(trocoPara) <= total)
+      return setErro(
+        "O valor para troco precisa ser maior que o total do pedido.",
+      );
+    const cl = await garantirCliente();
+    if (!cl) return;
+    setEnviando(true);
+    setErro("");
+    const pagamento: FormaPagamento =
+      metodo === "pix_online"
+        ? "pix"
+        : metodo === "cartao_online"
+          ? "cartao"
+          : metodo;
+    const pedidoBody: any = {
+      empresaId: empresa.id,
+      cliente: {
+        nome: cl.nome,
+        cpf: cl.cpf,
+        telefone: cl.whatsapp,
+        whatsapp: cl.whatsapp,
+      },
+      tipoEntrega: tipo,
+      endereco: tipo === "entrega" ? enderecoCompleto() : null,
+      cepEntrega: tipo === "entrega" ? end.cep : null,
+      taxaEntrega: taxa,
+      provedorEntrega:
+        tipo === "entrega" && entCfg.uber_direct ? "uber_direct" : null,
+      quoteId: uberQuote?.quoteId || null,
+      pagamento,
+      pagamentoOnline: metodo === "pix_online" || metodo === "cartao_online",
+      observacoes,
+      precisaTroco: metodo === "dinheiro" && precisaTroco,
+      trocoPara:
+        metodo === "dinheiro" && precisaTroco ? Number(trocoPara) : null,
+      itens,
+      usarFidelidade: usarFid,
+    };
+    pedidoBody.chaveSolicitacao = await chavePedidoCliente(
+      empresa.id,
+      pedidoBody,
+    );
+    const r = await fetch("/api/pedidos", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(pedidoBody),
+      }),
+      d = await r.json();
+    if (!r.ok) {
+      setEnviando(false);
+      return setErro(d.error || "Não foi possível criar o pedido.");
+    }
+    if (d.recuperado) {
+      setEnviando(false);
+      concluirSolicitacaoPedido(empresa!.id);
+      limpar();
+      router.push(`/pedido/${d.numero}`);
+      return;
+    }
+    if (metodo === "cartao_online" && d.provedor_pagamento === "pagbank") {
+      setEnviando(false);
+      return setErro(
+        "Cartão PagBank ainda não disponível. Selecione PIX online.",
+      );
+    }
+    if (metodo === "cartao_online") {
+      const cr = await fetch("/api/pagamentos/mercado-pago", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ pedidoId: d.id }),
+        }),
+        cd = await cr.json();
+      setEnviando(false);
+      if (!cr.ok || !cd.url)
+        return setErro(
+          cd.error ||
+            "Pedido criado, mas não foi possível iniciar o cartão online.",
+        );
+      concluirSolicitacaoPedido(empresa!.id);
+      limpar();
+      window.location.assign(cd.url);
+      return;
+    }
+    if (metodo === "pix_online") {
+      const pr = await fetch(
+          d.provedor_pagamento === "pagbank"
+            ? "/api/pagamentos/pagbank/pix"
+            : "/api/pagamentos/mercado-pago/pix",
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ pedidoId: d.id, email, cpf: cl.cpf }),
+          },
+        ),
+        pd = await pr.json();
+      setEnviando(false);
+      if (!pr.ok)
+        return setErro(
+          pd.error || "Pedido criado, mas não foi possível gerar o PIX.",
+        );
+      setPix({ ...pd, numero: d.numero });
+      concluirSolicitacaoPedido(empresa!.id);
+      limpar();
+      return;
+    }
+    setEnviando(false);
+    concluirSolicitacaoPedido(empresa!.id);
+    limpar();
+    router.push(`/pedido/${d.numero}`);
+  }
+  if (pix)
+    return (
+      <main className="mx-auto max-w-md p-5">
+        <h1 className="text-xl font-bold">Pedido #{pix.numero}</h1>
+        <div className="mt-4 rounded-2xl border bg-white p-5 text-center">
+          <h2 className="font-bold">Pague com PIX</h2>
+          <p className="mt-1 text-sm text-neutral-500">
+            Pagamento em ambiente{" "}
+            {pix.ambiente === "teste" ? "de teste" : "de produção"}.
+          </p>
+          {pix.qrCodeBase64 && (
+            <img
+              alt="QR Code PIX"
+              className="mx-auto mt-4 w-56"
+              src={
+                pix.qrCodeBase64.startsWith("data:")
+                  ? pix.qrCodeBase64
+                  : `data:image/png;base64,${pix.qrCodeBase64}`
+              }
+            />
+          )}{" "}
+          {pix.qrCode && (
+            <>
+              <textarea
+                readOnly
+                value={pix.qrCode}
+                className="mt-4 h-24 w-full rounded-lg border p-2 text-xs"
+              />
+              <button
+                onClick={() => navigator.clipboard.writeText(pix.qrCode)}
+                className="mt-2 w-full rounded-lg bg-brand-700 py-3 text-sm font-bold text-white"
+              >
+                Copiar código PIX
+              </button>
+            </>
+          )}
+          {pix.ticketUrl && (
+            <a
+              href={pix.ticketUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="mt-3 block text-sm text-brand-700 underline"
+            >
+              Abrir instruções do PIX
+            </a>
+          )}
+        </div>
+        <Link
+          href={`/pedido/${pix.numero}`}
+          className="mt-4 block text-center text-sm text-brand-700"
+        >
+          Acompanhar pedido
+        </Link>
+      </main>
+    );
+  return (
+    <main className="mx-auto max-w-md p-4 pb-24">
+      <h1 className="mb-4 text-lg font-bold">Finalizar pedido</h1>
+      {!cliente ? (
+        <section className="mb-4 rounded-xl border bg-white p-4">
+          <h2 className="font-semibold">Seus dados</h2>
+          <div className="mt-3 grid gap-2">
+            <input
+              value={cadastro.nome}
+              onChange={(e) =>
+                setCadastro({ ...cadastro, nome: e.target.value })
+              }
+              placeholder="Nome completo"
+              className="rounded-lg border px-3 py-2"
+            />
+            <input
+              value={cadastro.cpf}
+              onChange={(e) =>
+                setCadastro({ ...cadastro, cpf: e.target.value })
+              }
+              inputMode="numeric"
+              placeholder="CPF"
+              className="rounded-lg border px-3 py-2"
+            />
+            <input
+              value={cadastro.whatsapp}
+              onChange={(e) =>
+                setCadastro({ ...cadastro, whatsapp: e.target.value })
+              }
+              inputMode="tel"
+              placeholder="WhatsApp com DDD"
+              className="rounded-lg border px-3 py-2"
+            />
+          </div>
+        </section>
+      ) : (
+        <div className="mb-4 rounded-xl border bg-white p-3">
+          <b>{cliente.nome}</b>
+          <p className="text-xs text-neutral-500">{cliente.whatsapp}</p>
+          <Link href="/cadastro" className="text-xs text-brand-700">
+            Editar cadastro
+          </Link>
+        </div>
+      )}
+      <div className="mb-4 flex gap-2">
+        {temEntrega && (
+          <button
+            onClick={() => setTipo("entrega")}
+            className={`flex-1 rounded-lg border py-3 ${tipo === "entrega" ? "border-brand-600 bg-brand-50 text-brand-700" : ""}`}
+          >
+            Entrega
+          </button>
+        )}
+        {temRetirada && (
+          <button
+            onClick={() => setTipo("retirada")}
+            className={`flex-1 rounded-lg border py-3 ${tipo === "retirada" ? "border-brand-600 bg-brand-50 text-brand-700" : ""}`}
+          >
+            Retirada
+          </button>
+        )}
+      </div>
+      {tipo === "entrega" && (
+        <section className="mb-4 rounded-xl border bg-white p-4">
+          <h2 className="font-semibold">Endereço de entrega</h2>
+          <div className="mt-3 flex gap-2">
+            <input
+              value={end.cep}
+              onChange={(e) => {
+                setEnd({ ...end, cep: e.target.value, validado: false });
+                setUberQuote(null);
+              }}
+              inputMode="numeric"
+              placeholder="CEP"
+              className="min-w-0 flex-1 rounded-lg border px-3 py-2"
+            />
+            <button
+              onClick={validarCep}
+              disabled={buscandoCep}
+              className="rounded-lg bg-neutral-900 px-4 text-sm font-semibold text-white"
+            >
+              {buscandoCep ? "Buscando..." : "Buscar"}
+            </button>
+          </div>
+          {end.validado && (
+            <div className="mt-3 grid gap-2">
+              <input
+                value={end.logradouro}
+                onChange={(e) => {
+                  setEnd({ ...end, logradouro: e.target.value });
+                  setUberQuote(null);
+                }}
+                placeholder="Rua"
+                className="rounded-lg border px-3 py-2"
+              />
+              <div className="grid grid-cols-2 gap-2">
+                <input
+                  value={end.numero}
+                  onChange={(e) => {
+                    setEnd({ ...end, numero: e.target.value });
+                    setUberQuote(null);
+                  }}
+                  placeholder="Número"
+                  className="rounded-lg border px-3 py-2"
+                />
+                <input
+                  value={end.complemento}
+                  onChange={(e) => {
+                    setEnd({ ...end, complemento: e.target.value });
+                    setUberQuote(null);
+                  }}
+                  placeholder="Complemento"
+                  className="rounded-lg border px-3 py-2"
+                />
+              </div>
+              <input
+                value={end.bairro}
+                onChange={(e) => {
+                  setEnd({ ...end, bairro: e.target.value });
+                  setUberQuote(null);
+                }}
+                placeholder="Bairro"
+                className="rounded-lg border px-3 py-2"
+              />
+              <div className="grid grid-cols-2 gap-2">
+                <input
+                  value={end.cidade}
+                  readOnly
+                  className="rounded-lg border bg-neutral-50 px-3 py-2"
+                />
+                <input
+                  value={end.estado}
+                  readOnly
+                  className="rounded-lg border bg-neutral-50 px-3 py-2"
+                />
+              </div>
+              {end.distanciaKm != null && (
+                <p className="text-xs text-green-700">
+                  Endereço dentro da área de entrega · aprox. {end.distanciaKm}{" "}
+                  km
+                </p>
+              )}
+              {entCfg.uber_direct && (
+                <div className="mt-2 rounded-xl border bg-neutral-50 p-3">
+                  {uberQuote ? (
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <b className="text-sm">Uber envio</b>
+                        <p className="text-xs text-neutral-500">
+                          {uberQuote.duracaoMinutos
+                            ? `Estimativa: ${uberQuote.duracaoMinutos} min`
+                            : "Cotação disponível"}
+                        </p>
+                      </div>
+                      <b>
+                        {freteGratis
+                          ? "Frete grátis"
+                          : `R$ ${uberQuote.valor.toFixed(2)}`}
+                      </b>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={cotarUber}
+                      disabled={cotandoUber || !end.numero.trim()}
+                      className="w-full rounded-lg bg-brand-700 py-2.5 text-sm font-bold text-white disabled:opacity-40"
+                    >
+                      {cotandoUber
+                        ? "Calculando Uber envio..."
+                        : "Calcular Uber envio"}
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+        </section>
+      )}
+      <label className="mb-1 block text-xs text-neutral-500">
+        Forma de pagamento
+      </label>
+      <div className="mb-4 grid grid-cols-2 gap-2">
+        {formas.map((f) => (
+          <button
+            key={f}
+            onClick={() => setMetodo(f)}
+            className={`rounded-lg border py-3 text-sm ${metodo === f ? "border-brand-600 bg-brand-50 text-brand-700" : ""}`}
+          >
+            {f === "pix_online"
+              ? "Pix (online)"
+              : f === "cartao_online"
+                ? "Cartão de crédito (online)"
+                : f === "cartao"
+                  ? tipo === "retirada"
+                    ? "Cartão de crédito no balcão"
+                    : "Cartão na entrega"
+                  : f === "pix"
+                    ? "Pix manual no balcão"
+                    : "Dinheiro"}
+          </button>
+        ))}
+      </div>
+      {tipo === "retirada" && (metodo === "cartao" || metodo === "pix") && (
+        <p className="mb-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
+          {metodo === "cartao"
+            ? "Você pagará com cartão de crédito no balcão da loja, ao retirar o pedido."
+            : "Você pagará por Pix no balcão da loja, ao retirar o pedido."}
+        </p>
+      )}
+      {metodo === "pix_online" && (
+        <div className="mb-4">
+          <label className="mb-1 block text-xs text-neutral-500">
+            E-mail para o pagamento
+          </label>
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="seu@email.com"
+            className="w-full rounded-lg border px-3 py-2"
+          />
+        </div>
+      )}
+      {metodo === "dinheiro" && (
+        <div className="mb-4 rounded-xl border bg-white p-4">
+          <p className="text-sm font-semibold">Precisa de troco?</p>
+          <div className="mt-2 flex gap-2">
+            <button
+              type="button"
+              onClick={() => setPrecisaTroco(false)}
+              className={`flex-1 rounded-lg border py-2 text-sm ${!precisaTroco ? "border-brand-600 bg-brand-50 text-brand-700" : ""}`}
+            >
+              Não
+            </button>
+            <button
+              type="button"
+              onClick={() => setPrecisaTroco(true)}
+              className={`flex-1 rounded-lg border py-2 text-sm ${precisaTroco ? "border-brand-600 bg-brand-50 text-brand-700" : ""}`}
+            >
+              Sim
+            </button>
+          </div>
+          {precisaTroco && (
+            <div className="mt-3">
+              <label className="mb-1 block text-xs text-neutral-500">
+                Troco para quanto?
+              </label>
+              <div className="flex items-center rounded-lg border px-3">
+                <span className="text-sm text-neutral-500">R$</span>
+                <input
+                  type="number"
+                  min="0"
+                  step=".01"
+                  value={trocoPara}
+                  onChange={(e) => setTrocoPara(e.target.value)}
+                  placeholder="50,00"
+                  className="w-full px-2 py-2 outline-none"
+                />
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+      <div className="mb-4">
+        <label className="mb-1 block text-xs text-neutral-500">
+          Observações do pedido{" "}
+          <span className="text-neutral-400">(opcional)</span>
+        </label>
+        <textarea
+          maxLength={500}
+          value={observacoes}
+          onChange={(e) => setObservacoes(e.target.value)}
+          placeholder="Ex.: retirar cebola, tocar o interfone, ponto da carne..."
+          className="min-h-20 w-full rounded-lg border px-3 py-2 text-sm"
+        />
+        <p className="mt-1 text-right text-[11px] text-neutral-400">
+          {observacoes.length}/500
+        </p>
+      </div>
+      {fid?.ativo && fid.cupom_disponivel && (
+        <label className="mb-4 flex gap-2 rounded-lg border p-3 text-sm">
+          <input
+            type="checkbox"
+            checked={usarFid}
+            onChange={(e) => setUsarFid(e.target.checked)}
+          />{" "}
+          Usar recompensa de fidelidade
+        </label>
+      )}
+      <div className="border-t pt-3 text-sm">
+        <div className="flex justify-between">
+          <span>Subtotal</span>
+          <span>R$ {subtotal.toFixed(2)}</span>
+        </div>
+        {desconto > 0 && (
+          <div className="flex justify-between text-green-700">
+            <span>Fidelidade</span>
+            <span>- R$ {desconto.toFixed(2)}</span>
+          </div>
+        )}
+        {tipo === "entrega" && freteGratis && (
+          <div className="flex justify-between font-semibold text-green-700">
+            <span>Entrega</span>
+            <span>Grátis</span>
+          </div>
+        )}
+        {taxa > 0 && (
+          <div className="flex justify-between">
+            <span>{entCfg.uber_direct ? "Uber envio" : "Taxa de entrega"}</span>
+            <span>R$ {taxa.toFixed(2)}</span>
+          </div>
+        )}
+        <div className="mt-2 flex justify-between text-lg font-bold">
+          <span>Total</span>
+          <span>R$ {total.toFixed(2)}</span>
+        </div>
+      </div>
+      {erro && (
+        <p className="mt-3 rounded-lg bg-red-50 p-3 text-sm text-red-700">
+          {erro}
+        </p>
+      )}
+      <ProducaoLoja />
+      <button
+        onClick={confirmar}
+        disabled={
+          !itens.length ||
+          enviando ||
+          !configCarregada ||
+          formas.length === 0 ||
+          (tipo === "entrega" && entCfg.uber_direct && !uberQuote)
+        }
+        className="mt-4 w-full rounded-lg bg-brand-700 py-3 font-semibold text-white disabled:opacity-40"
+      >
+        {enviando
+          ? "Processando..."
+          : metodo === "pix_online"
+            ? "Ir para pagamento Pix"
+            : metodo === "cartao_online"
+              ? "Pagar com cartão de crédito"
+              : "Confirmar pedido"}
+      </button>
+    </main>
+  );
+}
