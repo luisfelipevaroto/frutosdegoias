@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { getEmpresaAdminAtual } from "@/lib/empresa-admin";
 
-type Cliente = { id:string; nome:string; cpf:string; telefone:string; whatsapp?:string|null; fidelidade_saldo:number; fidelidade_credito:number; fidelidade_cupom_disponivel:boolean };
+type Cliente = { id:string; nome:string; cpf:string|null; telefone:string; whatsapp?:string|null; fidelidade_saldo:number; fidelidade_credito:number; fidelidade_cupom_disponivel:boolean };
 type Cfg = { ativo:boolean; modo:"meta"|"cashback"; meta:number; tipo_recompensa:"percentual"|"fixo"; valor_recompensa:number; cashback_percentual:number };
 const padrao:Cfg={ativo:false,modo:"meta",meta:100,tipo_recompensa:"percentual",valor_recompensa:10,cashback_percentual:5};
 const brl=(v:number)=>v.toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
@@ -56,7 +56,7 @@ export default function FidelidadeAdmin(){
   }
 
   if(liberado!==true)return <main className="p-4 text-sm text-neutral-500">Verificando acesso...</main>;
-  const lista=clientes.filter(c=>`${c.nome} ${c.cpf} ${c.whatsapp||c.telefone}`.toLowerCase().includes(busca.toLowerCase()));
+  const lista=clientes.filter(c=>`${c.nome} ${c.cpf??""} ${c.whatsapp||c.telefone}`.toLowerCase().includes(busca.toLowerCase()));
   return <main className="min-h-screen bg-neutral-50 p-4"><div className="mx-auto max-w-5xl">
     <Link href="/admin" className="text-sm text-brand-700">← Voltar</Link><h1 className="mt-1 text-xl font-bold">Fidelidade · {empresaNome}</h1>
     {msg&&<div className="my-4 rounded-lg bg-white p-3 text-sm shadow-sm">{msg}</div>}
@@ -66,7 +66,7 @@ export default function FidelidadeAdmin(){
       <button onClick={salvar} className="mt-4 rounded-lg bg-brand-700 px-5 py-2 text-sm font-semibold text-white">Salvar configuração</button>
     </section>
     <input value={busca} onChange={e=>setBusca(e.target.value)} placeholder="Buscar cliente por nome, CPF ou telefone" className="mb-4 w-full rounded-lg border bg-white px-3 py-2 text-sm"/>
-    <div className="space-y-3">{lista.map(c=><section key={c.id} className="rounded-xl border bg-white p-4"><div className="flex flex-wrap justify-between gap-3"><div><b>{c.nome}</b><p className="text-xs text-neutral-500">{c.cpf} · {c.whatsapp||c.telefone}</p></div><div className="text-right">{cfg.modo==="cashback"?<><b className="text-green-700">{brl(Number(c.fidelidade_credito||0))} de crédito</b><p className="text-xs text-neutral-500">Disponível para resgate</p></>:<><b>{brl(Number(c.fidelidade_saldo||0))} / {brl(cfg.meta)}</b><p className="text-xs">{c.fidelidade_cupom_disponivel?"Recompensa liberada":"Acumulando compras"}</p></>}</div></div>
+    <div className="space-y-3">{lista.map(c=><section key={c.id} className="rounded-xl border bg-white p-4"><div className="flex flex-wrap justify-between gap-3"><div><b>{c.nome}</b><p className="text-xs text-neutral-500">{c.cpf && `${c.cpf} · `}{c.whatsapp||c.telefone}</p></div><div className="text-right">{cfg.modo==="cashback"?<><b className="text-green-700">{brl(Number(c.fidelidade_credito||0))} de crédito</b><p className="text-xs text-neutral-500">Disponível para resgate</p></>:<><b>{brl(Number(c.fidelidade_saldo||0))} / {brl(cfg.meta)}</b><p className="text-xs">{c.fidelidade_cupom_disponivel?"Recompensa liberada":"Acumulando compras"}</p></>}</div></div>
       <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_auto]"><input value={valor[c.id]||""} onChange={e=>setValor(v=>({...v,[c.id]:e.target.value}))} placeholder="Valor da compra" className="rounded border p-2 text-sm"/><button disabled={!cfg.ativo||processando===c.id} onClick={()=>lancar(c.id)} className="rounded bg-brand-700 px-4 py-2 text-sm text-white disabled:opacity-40">Lançar compra</button></div>
       {cfg.modo==="cashback"&&Number(c.fidelidade_credito)>0&&<div className="mt-3 border-t pt-3"><p className="mb-2 text-xs font-semibold text-neutral-500">Resgate manual de cashback</p><div className="grid gap-2 sm:grid-cols-[140px_1fr_auto]"><input value={resgate[c.id]||""} onChange={e=>setResgate(v=>({...v,[c.id]:e.target.value}))} placeholder="Valor R$" className="rounded border p-2 text-sm"/><input value={motivo[c.id]||""} onChange={e=>setMotivo(v=>({...v,[c.id]:e.target.value}))} placeholder="Motivo / observação" className="rounded border p-2 text-sm"/><button disabled={processando===c.id} onClick={()=>resgatar(c.id)} className="rounded border px-4 py-2 text-sm font-semibold disabled:opacity-40">Resgatar</button></div></div>}
       <div className="mt-3 flex justify-end border-t pt-3"><button disabled={processando===c.id} onClick={()=>zerar(c)} className="rounded-lg border border-red-200 px-3 py-2 text-xs font-semibold text-red-700 disabled:opacity-40">Zerar saldo</button></div>

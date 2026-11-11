@@ -13,7 +13,7 @@ type Variacao = { id: string; nome: string; preco: number };
 type Adicional = { id: string; nome: string; preco: number };
 type Produto = { id: string; nome: string; preco: number | null; preco_promocional: number | null; foto_url?: string | null; categoria?: string | null; variacoes: Variacao[]; adicionais: Adicional[]; grupos: GrupoAdicionais[] };
 type Item = { chave: string; produto_id: string; nome: string; variacao_id: string | null; variacao_nome?: string; adicionais: Adicional[]; quantidade: number; preco_base: number };
-type Cliente = { id: string; nome: string; cpf: string; telefone: string; whatsapp?: string };
+type Cliente = { id: string; nome: string; cpf: string | null; telefone: string; whatsapp?: string | null };
 type EntregaCfg = { propria?: boolean; retirada?: boolean; taxa?: number; pedido_minimo?: number };
 type PagamentoCfg = { dinheiro?: boolean; cartao_entrega?: boolean; pix_manual?: boolean; online?: boolean };
 type Fidelidade = { ativo?: boolean; modo?: "meta" | "cashback"; saldo?: number; credito?: number; cupom_disponivel?: boolean; meta?: number; tipo_recompensa?: "percentual" | "fixo"; valor_recompensa?: number };
@@ -47,6 +47,8 @@ export default function PDV() {
   const [trocoPara, setTrocoPara] = useState("");
   const [erro, setErro] = useState("");
   const [salvando, setSalvando] = useState(false);
+  const [tipoCadastro, setTipoCadastro] = useState<"completo" | "simples">("completo");
+  const [cadastrando, setCadastrando] = useState(false);
   const [novo, setNovo] = useState({ nome: "", cpf: "", telefone: "" });
 
   useEffect(() => {
@@ -116,14 +118,39 @@ export default function PDV() {
   }
   function qtd(i: number, n: number) { setItens((xs) => n <= 0 ? xs.filter((_, x) => x !== i) : xs.map((x, k) => k === i ? { ...x, quantidade: n } : x)); }
 
-  async function cadastrarCliente() {
-    const cpf = novo.cpf.replace(/\D/g, ""), tel = novo.telefone.replace(/\D/g, "");
-    if (!novo.nome.trim() || cpf.length !== 11 || tel.length < 10) return setErro("Informe nome, CPF e telefone válidos.");
-    const { data, error } = await supabase.from("clientes").upsert({ empresa_id: empresaId, nome: novo.nome.trim(), cpf, telefone: tel, whatsapp: tel }, { onConflict: "empresa_id,cpf" }).select("id,nome,cpf,telefone,whatsapp").single();
-    if (error) setErro(error.message); else { setCliente(data as Cliente); setNovo({ nome: "", cpf: "", telefone: "" }); setBuscaCliente(""); }
+  async function cadastrarCliente(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!empresaId || cadastrando || salvando) return;
+    const nome = novo.nome.trim();
+    const telefone = novo.telefone.replace(/\D/g, "");
+    const cpf = tipoCadastro === "completo" ? novo.cpf.replace(/\D/g, "") : null;
+    if (!nome) return setErro("Informe o nome do cliente.");
+    if (cpf !== null && cpf.length !== 11) return setErro("Informe um CPF com 11 dígitos.");
+    if (telefone.length < 10 || telefone.length > 15) return setErro("Informe um telefone válido com DDD.");
+
+    setErro("");
+    setCadastrando(true);
+    try {
+      const { data, error } = await supabase.rpc("admin_cadastrar_cliente_pdv", {
+        p_empresa_id: empresaId, p_nome: nome, p_telefone: telefone, p_cpf: cpf,
+      });
+      if (error || !data) {
+        setErro(error?.code === "22023" ? error.message : "Não foi possível cadastrar o cliente. Tente novamente.");
+        return;
+      }
+      setCliente(data as Cliente);
+      setNovo({ nome: "", cpf: "", telefone: "" });
+      setBuscaCliente("");
+      setClientes([]);
+    } catch {
+      setErro("Não foi possível cadastrar o cliente. Tente novamente.");
+    } finally {
+      setCadastrando(false);
+    }
   }
 
   async function finalizar() {
+    if (cadastrando || salvando) return;
     if (!itens.length) return setErro("Adicione produtos ao pedido.");
     if (tipo === "entrega" && !endereco.trim()) return setErro("Informe o endereço de entrega.");
     if (subtotal < Number(entregaCfg.pedido_minimo ?? 0)) return setErro(`O pedido mínimo é ${brl(Number(entregaCfg.pedido_minimo))}.`);
@@ -148,7 +175,32 @@ export default function PDV() {
       <div className="my-3 flex gap-2 overflow-x-auto">{categorias.map((c) => <button key={c} onClick={() => setCategoria(c)} className={`shrink-0 rounded-full px-3 py-1.5 text-xs ${categoria === c ? "bg-brand-700 text-white" : "border bg-white"}`}>{c === "todos" ? "Todos" : c}</button>)}</div>
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{lista.map((p) => <button key={p.id} onClick={() => abrirProduto(p)} className="overflow-hidden rounded-xl border bg-white text-left hover:border-brand-400">{p.foto_url ? <img src={p.foto_url} alt={p.nome} className="h-28 w-full object-cover" /> : <div className="flex h-28 items-center justify-center bg-neutral-100 text-xs text-neutral-400">Sem imagem</div>}<div className="p-3"><b className="block">{p.nome}</b><span className="text-sm text-brand-700">{p.variacoes?.length ? "Escolher opção" : brl(Number(p.preco_promocional ?? p.preco ?? 0))}</span></div></button>)}</div>
     </section><aside className="space-y-3">
-      <section className="rounded-xl border bg-white p-4"><h2 className="font-semibold">Cliente <span className="text-xs font-normal text-neutral-400">(opcional)</span></h2>{cliente ? <div className="mt-2 rounded-lg bg-green-50 p-3 text-sm"><b>{cliente.nome}</b><p>{cliente.cpf} · {cliente.whatsapp || cliente.telefone}</p>{fidelidade?.ativo && <div className="mt-2 border-t border-green-200 pt-2">{fidelidade.modo === "cashback" ? <><p className="font-medium">Cashback disponível: {brl(cashbackDisponivel)}</p>{cashbackDisponivel > 0 && <label className="mt-2 flex cursor-pointer items-center gap-2"><input type="checkbox" checked={usarCashback} onChange={(e) => setUsarCashback(e.target.checked)} />Usar cashback neste pedido</label>}</> : <><p className="font-medium">Fidelidade: {brl(Number(fidelidade.saldo || 0))} / {brl(Number(fidelidade.meta || 100))}</p>{fidelidade.cupom_disponivel && <p className="mt-1 font-semibold text-green-800">Recompensa disponível</p>}</>}</div>}<button onClick={() => { setCliente(null); setFidelidade(null); setUsarCashback(false); }} className="mt-2 text-xs underline">Remover vínculo</button></div> : <><input value={buscaCliente} onChange={(e) => setBuscaCliente(e.target.value)} placeholder="Buscar por nome, CPF ou telefone" className="mt-2 w-full rounded border p-2 text-sm" />{clientes.map((c) => <button key={c.id} onClick={() => { setCliente(c); setBuscaCliente(""); setClientes([]); }} className="block w-full border-b p-2 text-left text-sm"><b>{c.nome}</b><br /><span className="text-xs text-neutral-500">{c.cpf} · {c.whatsapp || c.telefone}</span></button>)}<details className="mt-3"><summary className="cursor-pointer text-sm font-medium text-brand-700">+ Cadastrar cliente</summary><div className="mt-2 grid gap-2"><input value={novo.nome} onChange={(e) => setNovo({ ...novo, nome: e.target.value })} placeholder="Nome" className="rounded border p-2 text-sm" /><input value={novo.cpf} onChange={(e) => setNovo({ ...novo, cpf: e.target.value })} placeholder="CPF" className="rounded border p-2 text-sm" /><input value={novo.telefone} onChange={(e) => setNovo({ ...novo, telefone: e.target.value })} placeholder="Telefone/WhatsApp" className="rounded border p-2 text-sm" /><button onClick={cadastrarCliente} className="rounded border p-2 text-sm font-semibold">Cadastrar e vincular</button></div></details></>}</section>
+      <section className="rounded-xl border bg-white p-4"><h2 className="font-semibold">Cliente <span className="text-xs font-normal text-neutral-400">(opcional)</span></h2>{cliente ? <div className="mt-2 rounded-lg bg-green-50 p-3 text-sm"><b>{cliente.nome}</b><p>{cliente.cpf && `${cliente.cpf} · `}{cliente.whatsapp || cliente.telefone}</p>{fidelidade?.ativo && <div className="mt-2 border-t border-green-200 pt-2">{fidelidade.modo === "cashback" ? <><p className="font-medium">Cashback disponível: {brl(cashbackDisponivel)}</p>{cashbackDisponivel > 0 && <label className="mt-2 flex cursor-pointer items-center gap-2"><input type="checkbox" checked={usarCashback} onChange={(e) => setUsarCashback(e.target.checked)} />Usar cashback neste pedido</label>}</> : <><p className="font-medium">Fidelidade: {brl(Number(fidelidade.saldo || 0))} / {brl(Number(fidelidade.meta || 100))}</p>{fidelidade.cupom_disponivel && <p className="mt-1 font-semibold text-green-800">Recompensa disponível</p>}</>}</div>}<button onClick={() => { setCliente(null); setFidelidade(null); setUsarCashback(false); }} className="mt-2 text-xs underline">Remover vínculo</button></div> : <><input disabled={cadastrando} value={buscaCliente} onChange={(e) => setBuscaCliente(e.target.value)} placeholder="Buscar por nome, CPF ou telefone" className="mt-2 w-full rounded border p-2 text-sm" />{clientes.map((c) => <button key={c.id} disabled={cadastrando} onClick={() => { setCliente(c); setBuscaCliente(""); setClientes([]); }} className="block w-full border-b p-2 text-left text-sm"><b>{c.nome}</b><br /><span className="text-xs text-neutral-500">{c.cpf && `${c.cpf} · `}{c.whatsapp || c.telefone}</span></button>)}<details className="mt-3">
+        <summary className="cursor-pointer text-sm font-medium text-brand-700">+ Cadastrar cliente</summary>
+        <form onSubmit={cadastrarCliente} className="mt-2">
+          <fieldset disabled={cadastrando || salvando} className="grid gap-2">
+            <legend className="sr-only">Tipo de cadastro</legend>
+            <div className="mb-1 flex flex-wrap gap-2 text-sm">
+              <label className="flex items-center gap-2 rounded border px-2 py-1.5">
+                <input type="radio" name="tipo-cadastro-pdv" checked={tipoCadastro === "completo"} onChange={() => setTipoCadastro("completo")} />
+                Cadastro completo
+              </label>
+              <label className="flex items-center gap-2 rounded border px-2 py-1.5">
+                <input type="radio" name="tipo-cadastro-pdv" checked={tipoCadastro === "simples"} onChange={() => setTipoCadastro("simples")} />
+                Cadastro simples
+              </label>
+            </div>
+            <input required aria-label="Nome" autoComplete="off" value={novo.nome} onChange={(e) => setNovo({ ...novo, nome: e.target.value })} placeholder="Nome" className="rounded border p-2 text-sm" />
+            {tipoCadastro === "completo" && (
+              <input required aria-label="CPF" inputMode="numeric" maxLength={14} value={novo.cpf} onChange={(e) => setNovo({ ...novo, cpf: e.target.value })} placeholder="CPF" className="rounded border p-2 text-sm" />
+            )}
+            <input required aria-label="Telefone ou WhatsApp" type="tel" value={novo.telefone} onChange={(e) => setNovo({ ...novo, telefone: e.target.value })} placeholder="Telefone/WhatsApp com DDD" className="rounded border p-2 text-sm" />
+            <button type="submit" disabled={!empresaId || cadastrando} className="rounded border p-2 text-sm font-semibold disabled:opacity-50">
+              {cadastrando ? "Cadastrando…" : "Cadastrar e vincular"}
+            </button>
+          </fieldset>
+        </form>
+      </details></>}</section>
       <section className="rounded-xl border bg-white p-4"><h2 className="font-semibold">Pedido</h2>{itens.length === 0 ? <p className="mt-2 text-sm text-neutral-400">Nenhum item.</p> : itens.map((i, n) => { const unit = i.preco_base + i.adicionais.reduce((s, a) => s + Number(a.preco), 0); return <div key={i.chave} className="border-b py-2 text-sm"><div className="flex justify-between gap-2"><div><b>{i.nome}</b>{i.variacao_nome && <p className="text-xs text-neutral-500">{i.variacao_nome}</p>}{i.adicionais.length > 0 && <p className="text-xs text-neutral-500">+ {i.adicionais.map((a) => `${a.nome} (${brl(Number(a.preco))})`).join(", ")}</p>}<p>{brl(unit)}</p></div><div className="flex items-center gap-2"><button onClick={() => qtd(n, i.quantidade - 1)} className="h-7 w-7 rounded border">−</button><span>{i.quantidade}</span><button onClick={() => qtd(n, i.quantidade + 1)} className="h-7 w-7 rounded border">+</button></div></div></div>; })}
         <div className="mt-3 flex gap-2">{entregaCfg.retirada !== false && <button onClick={() => setTipo("retirada")} className={`flex-1 rounded border p-2 text-sm ${tipo === "retirada" ? "border-brand-600 bg-brand-50" : ""}`}>Retirada</button>}{entregaCfg.propria && <button onClick={() => { setTipo("entrega"); setTaxa(String(entregaCfg.taxa ?? 0)); }} className={`flex-1 rounded border p-2 text-sm ${tipo === "entrega" ? "border-brand-600 bg-brand-50" : ""}`}>Entrega</button>}</div>
         {tipo === "entrega" && <><input value={endereco} onChange={(e) => setEndereco(e.target.value)} placeholder="Endereço de entrega" className="mt-2 w-full rounded border p-2 text-sm" /><p className="mt-1 text-xs text-neutral-500">Taxa configurada: {brl(Number(taxa || 0))}</p></>}
@@ -156,7 +208,7 @@ export default function PDV() {
         {pagamento === "dinheiro" && <label className="mt-2 flex items-center gap-2 text-sm"><input type="checkbox" checked={troco} onChange={(e) => setTroco(e.target.checked)} />Precisa de troco</label>}{pagamento === "dinheiro" && troco && <input type="number" step=".01" value={trocoPara} onChange={(e) => setTrocoPara(e.target.value)} placeholder="Troco para R$" className="mt-2 w-full rounded border p-2 text-sm" />}
         <textarea maxLength={500} value={observacoes} onChange={(e) => setObservacoes(e.target.value)} placeholder="Observações do pedido (opcional)" className="mt-2 min-h-20 w-full rounded border p-2 text-sm" />
         <div className="mt-3 text-sm"><div className="flex justify-between"><span>Subtotal</span><span>{brl(subtotal)}</span></div>{tipo === "entrega" && <div className="flex justify-between"><span>Entrega</span><span>{brl(Number(taxa || 0))}</span></div>}{cashbackAplicar > 0 && <div className="flex justify-between font-medium text-green-700"><span>Cashback</span><span>− {brl(cashbackAplicar)}</span></div>}<div className="mt-2 flex justify-between border-t pt-2 text-lg font-bold"><span>Total</span><span>{brl(totalPrevisto)}</span></div></div>
-        <button disabled={salvando || !itens.length} onClick={finalizar} className="mt-3 w-full rounded-lg bg-brand-700 p-3 font-semibold text-white disabled:opacity-40">{salvando ? "Criando pedido..." : "Criar pedido"}</button>
+        <button disabled={salvando || cadastrando || !itens.length} onClick={finalizar} className="mt-3 w-full rounded-lg bg-brand-700 p-3 font-semibold text-white disabled:opacity-40">{salvando ? "Criando pedido..." : "Criar pedido"}</button>
       </section></aside></div>
     {produtoModal && <div className="fixed inset-0 z-50 flex items-end justify-center overflow-y-auto bg-black/40 p-2 sm:items-center sm:p-4" onClick={() => setProdutoModal(null)}><div className="flex max-h-[calc(100dvh-1rem)] w-full max-w-md flex-col overflow-hidden rounded-2xl bg-white sm:max-h-[90vh]" onClick={(e) => e.stopPropagation()}><div className="shrink-0 border-b p-4 sm:p-5"><div className="flex justify-between gap-3"><div className="min-w-0"><h2 className="truncate text-lg font-bold">{produtoModal.nome}</h2><p className="text-xs text-neutral-500">Configure o item</p></div><button onClick={() => setProdutoModal(null)} className="shrink-0 text-xl">×</button></div></div><div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-5">{produtoModal.variacoes?.length > 0 && <div><p className="mb-2 text-sm font-semibold">Variação</p><div className="grid gap-2">{produtoModal.variacoes.map((v) => <button key={v.id} onClick={() => setVariacaoModal(v)} className={`flex justify-between gap-3 rounded-lg border p-3 text-sm ${variacaoModal?.id === v.id ? "border-brand-600 bg-brand-50" : ""}`}><span className="text-left">{v.nome}</span><b className="shrink-0">{brl(Number(v.preco))}</b></button>)}</div></div>}{produtoModal.grupos.length>0&&<div className="mt-4"><EscolhaGrupos grupos={produtoModal.grupos} selecionados={adicionaisModal} onChange={setAdicionaisModal}/></div>}{produtoModal.adicionais.length > 0 && <div className="mt-4"><div className="mb-2 flex items-center justify-between gap-2"><p className="text-sm font-semibold">Adicionais</p><span className="text-xs text-neutral-400">{adicionaisModal.length} selecionado{adicionaisModal.length === 1 ? "" : "s"}</span></div><div className="grid max-h-[38vh] gap-2 overflow-y-auto overscroll-contain pr-1 sm:max-h-72">{produtoModal.adicionais.map((a) => <label key={a.id} className="flex cursor-pointer items-start justify-between gap-3 rounded-lg border p-3 text-sm"><span className="min-w-0"><input type="checkbox" checked={adicionaisModal.some((x) => x.id === a.id)} onChange={() => alternarAdicional(a)} className="mr-2" />{a.nome}</span><b className="shrink-0">+ {brl(Number(a.preco))}</b></label>)}</div></div>}</div><div className="shrink-0 border-t bg-white p-4 sm:p-5">{pendenciaGrupo&&<p role="status" className="mb-2 text-xs text-neutral-600">{pendenciaGrupo}</p>}<button disabled={!!pendenciaGrupo||!!(produtoModal.variacoes.length&&!variacaoModal)} onClick={confirmarProduto} className="w-full rounded-lg bg-brand-700 p-3 font-bold text-white disabled:opacity-40">Adicionar ao pedido</button></div></div></div>}
   </div></main>;
