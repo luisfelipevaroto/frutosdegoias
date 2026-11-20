@@ -86,11 +86,18 @@ export default function PDV() {
   useEffect(() => {
     setFidelidade(null); setUsarCashback(false);
     if (!cliente?.id) return;
+    let ativo = true;
     (async () => {
-      const { data, error } = await supabase.rpc("admin_consultar_fidelidade_cliente", { p_cliente_id: cliente.id });
-      if (!error) setFidelidade(data as Fidelidade);
+      const [modulo, fidelidade] = await Promise.all([
+        supabase.rpc("modulo_empresa_ativo", { p_empresa_id: empresaId, p_chave: "fidelidade" }),
+        supabase.rpc("admin_consultar_fidelidade_cliente", { p_cliente_id: cliente.id }),
+      ]);
+      if (ativo && !modulo.error && modulo.data === true && !fidelidade.error) {
+        setFidelidade(fidelidade.data as Fidelidade);
+      }
     })();
-  }, [cliente?.id]);
+    return () => { ativo = false; };
+  }, [cliente?.id, empresaId]);
 
   const categorias = useMemo(() => ["todos", ...Array.from(new Set(produtos.map((p) => p.categoria).filter(Boolean) as string[]))], [produtos]);
   const pendenciaGrupo=produtoModal?validarSelecaoGrupos(produtoModal.grupos,adicionaisModal):"";
