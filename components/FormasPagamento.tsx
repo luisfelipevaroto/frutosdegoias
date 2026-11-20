@@ -23,7 +23,7 @@ export default function FormasPagamento({
   return (
     <section className="rounded-xl border bg-white p-4">
       <h2 className="font-bold">Formas de pagamento</h2>
-      {campos.map(([campo, label]) => (
+      {campos.filter(([campo]) => liberado || (campo !== "cartao_online" && campo !== "pix_online")).map(([campo, label]) => (
         <label
           key={campo}
           className="flex items-center justify-between gap-3 border-b py-2 text-sm"
@@ -45,14 +45,14 @@ export default function FormasPagamento({
           />
         </label>
       ))}
-      {!online && (
+      {liberado && !online && (
         <p className="mt-3 text-xs text-neutral-500">
           {liberado
             ? "Configure o provedor para liberar pagamentos online."
             : "Pagamento online não está incluído no plano desta empresa."}
         </p>
       )}
-      {provedor === "pagbank" && (
+      {liberado && provedor === "pagbank" && (
         <p className="mt-3 text-xs text-amber-800">
           PagBank disponível para Pix online. Cartão de crédito online ainda não
           está disponível para este provedor.

@@ -71,11 +71,6 @@ export default function Pedido() {
       }
       setEmpresa(e);
       setEmpresaId(e.id);
-      const { data: m } = await supabase.rpc("modulo_empresa_ativo", {
-        p_empresa_id: e.id,
-        p_chave: "whatsapp_api",
-      });
-      setWhatsappAtivo(m === true);
       let c: any;
       try {
         const s = localStorage.getItem(KEY);
@@ -110,8 +105,23 @@ export default function Pedido() {
       supabase.removeChannel(ch);
     };
   }, [dados?.pedido?.id, cred, empresaId]);
+  useEffect(() => {
+    setWhatsappAtivo(false);
+    if (!empresaId) return;
+    let ativo = true;
+    async function atualizar() {
+      try {
+        const { data, error } = await supabase.rpc("whatsapp_disponivel_cliente", { p_empresa_id: empresaId });
+        if (ativo) setWhatsappAtivo(!error && data === true);
+      } catch { if (ativo) setWhatsappAtivo(false); }
+    }
+    void atualizar();
+    const timer = setInterval(atualizar, 15000);
+    window.addEventListener("focus", atualizar);
+    return () => { ativo = false; clearInterval(timer); window.removeEventListener("focus", atualizar); };
+  }, [empresaId]);
   async function ativarWhatsApp() {
-    if (!cred || !empresaId || !dados?.pedido) return;
+    if (!whatsappAtivo || !cred || !empresaId || !dados?.pedido) return;
     setAtivandoWhats(true);
     const { data: ok } = await supabase.rpc("ativar_whatsapp_pedido_cliente", {
       p_empresa_id: empresaId,

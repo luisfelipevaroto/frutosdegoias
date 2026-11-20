@@ -57,6 +57,8 @@ export default function Integracoes() {
     [dados, setDados] = useState<any[]>([]),
     [pag, setPag] = useState<Pag>(pag0),
     [ent, setEnt] = useState<Ent>(ent0),
+    [moduloWhatsapp, setModuloWhatsapp] = useState(false),
+    [moduloTracking, setModuloTracking] = useState(false),
     [moduloFreteGratis, setModuloFreteGratis] = useState(false),
     [moduloEntrega, setModuloEntrega] = useState(false),
     [moduloEntregaPropria, setModuloEntregaPropria] = useState(false),
@@ -92,7 +94,7 @@ export default function Integracoes() {
       setEmpresaId(id);
       setEmpresaNome(e.nome);
     }
-    const [i, p, e, cs, ws, us, ifs, tr, mi, mp, mo, mg] = await Promise.all([
+    const [i, p, e, cs, ws, us, ifs, tr, mi, mp, mo, mg, mw, mt] = await Promise.all([
       supabase.from("integracoes_empresa").select("*").eq("empresa_id", id),
       supabase
         .from("configuracoes_loja")
@@ -132,7 +134,15 @@ export default function Integracoes() {
         p_empresa_id: id,
         p_chave: "frete_gratis",
       }),
+      supabase.rpc("modulo_empresa_ativo", { p_empresa_id: id, p_chave: "whatsapp_api" }),
+      supabase.rpc("modulo_empresa_ativo", { p_empresa_id: id, p_chave: "tracking" }),
     ]);
+    setModuloWhatsapp(!mw.error && mw.data === true);
+    setModuloTracking(!mt.error && mt.data === true);
+    setModuloFreteGratis(!mg.error && mg.data === true);
+    setModuloEntrega(!mi.error && mi.data === true);
+    setModuloEntregaPropria(!mp.error && mp.data === true);
+    setModuloPagamentoOnline(!mo.error && mo.data === true);
     if (
       mg.error ||
       i.error ||
@@ -155,10 +165,6 @@ export default function Integracoes() {
       );
       return;
     }
-    setModuloFreteGratis(mg.data === true);
-    setModuloEntrega(mi.data === true);
-    setModuloEntregaPropria(mp.data === true);
-    setModuloPagamentoOnline(mo.data === true);
     setDados(i.data ?? []);
     setCredStatus(cs.data ?? []);
     setWhatsStatus(ws.data ?? []);
@@ -181,7 +187,32 @@ export default function Integracoes() {
     setEnt(ev);
   }
   useEffect(() => {
-    carregar();
+    void carregar();
+    const atualizar = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      const empresa = user ? await getEmpresaAdminAtual(user.id) : null;
+      if (!empresa) {
+        setModuloWhatsapp(false);
+        setModuloTracking(false);
+        setModuloFreteGratis(false);
+        setModuloEntrega(false);
+        setModuloEntregaPropria(false);
+        setModuloPagamentoOnline(false);
+        return;
+      }
+      const chaves = ["whatsapp_api", "tracking", "frete_gratis", "entrega_integrada", "entrega_propria", "pagamento_online"];
+      const respostas = await Promise.all(chaves.map(p_chave => supabase.rpc("modulo_empresa_ativo", { p_empresa_id: empresa.id, p_chave })));
+      const ativo = (i: number) => !respostas[i].error && respostas[i].data === true;
+      setModuloWhatsapp(ativo(0));
+      setModuloTracking(ativo(1));
+      setModuloFreteGratis(ativo(2));
+      setModuloEntrega(ativo(3));
+      setModuloEntregaPropria(ativo(4));
+      setModuloPagamentoOnline(ativo(5));
+    };
+    const timer = setInterval(atualizar, 60000);
+    window.addEventListener("focus", atualizar);
+    return () => { clearInterval(timer); window.removeEventListener("focus", atualizar); };
   }, []);
   const pagamentoConectado = provedorConfigurado(credStatus);
   function item(tipo: string, provedor: string) {
@@ -783,6 +814,7 @@ export default function Integracoes() {
         {pagamentoConectado === "mercado_pago" && (
           <ConfirmacaoMercadoPago empresaId={empresaId} />
         )}
+        {moduloTracking && <>
         <h2 className="mt-8 font-bold">Marketing e rastreamento</h2>
         <section className="mt-3 rounded-xl border bg-white p-4">
           <div className="flex items-start justify-between gap-3">
@@ -808,6 +840,8 @@ export default function Integracoes() {
             Configurar rastreamento
           </Link>
         </section>
+        </>}
+        {moduloWhatsapp && <>
         <h2 className="mt-8 font-bold">Comunicação</h2>
         <section className="mt-3 rounded-xl border bg-white p-4">
           <div className="flex justify-between gap-3">
@@ -832,6 +866,8 @@ export default function Integracoes() {
               : "Configurar WhatsApp Oficial"}
           </Link>
         </section>
+        </>}
+        {moduloPagamentoOnline && <>
         <h2 className="mt-8 font-bold">Outros provedores de pagamento</h2>
         <div className="mt-3 grid gap-3 md:grid-cols-2">
           {PROVEDORES.map(([tipo, provedor, nome]) => {
@@ -849,6 +885,7 @@ export default function Integracoes() {
             );
           })}
         </div>
+        </>}
       </div>
     </main>
   );
