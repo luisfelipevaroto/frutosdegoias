@@ -53,6 +53,7 @@ test("menu da empresa oculta Fidelidade e Pedidos desativados e mostra os libera
     const html = renderToStaticMarkup(React.createElement(Page));
     assert.equal(html.includes('href="/admin/fidelidade"'), liberado);
     assert.equal(html.includes('href="/admin/pedidos"'), liberado);
+    assert.ok(html.includes('href="/admin/clientes"'));
   }
 });
 
@@ -93,6 +94,6 @@ test("acesso direto segue os mesmos módulos dos menus", () => {
     ["/admin/integracoes/ifood", "entrega_integrada"],
     ["/admin/integracoes/uber-direct", "entrega_integrada"],
     ["/admin/integracoes/rastreamento", "tracking"],
-    ["/admin/login", null], ["/admin", null], ["/admin/integracoes", null],
+    ["/admin/clientes", null], ["/admin/login", null], ["/admin", null], ["/admin/integracoes", null],
   ]) assert.equal(moduloDaRotaPainel(rota), modulo);
 });
