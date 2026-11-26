@@ -316,6 +316,18 @@ export default function Checkout() {
     return novo;
   }
   async function confirmar() {
+    if (enviando) return;
+    setEnviando(true);
+    setErro("");
+    try {
+      await executarConfirmacao();
+    } catch {
+      setErro("Não foi possível concluir o pagamento. Tente novamente para retomar este pedido.");
+    } finally {
+      setEnviando(false);
+    }
+  }
+  async function executarConfirmacao() {
     if (!empresa) return setErro("Empresa não identificada.");
     if (!configCarregada) return setErro("Aguarde as configurações.");
     if (tipo === "entrega" && (!end.validado || !end.numero.trim()))
@@ -383,7 +395,7 @@ export default function Checkout() {
       setEnviando(false);
       return setErro(d.error || "Não foi possível criar o pedido.");
     }
-    if (d.recuperado) {
+    if (d.recuperado && metodo !== "pix_online" && metodo !== "cartao_online") {
       setEnviando(false);
       concluirSolicitacaoPedido(empresa!.id);
       limpar();

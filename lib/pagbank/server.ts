@@ -13,7 +13,7 @@ const BASES: Record<PagBankAmbiente, string> = {
 };
 
 export class PagBankApiError extends Error {
-  constructor(public readonly status: number, message: string) {
+  constructor(public readonly status: number, message: string, public readonly liberacaoNecessaria = false) {
     super(message);
     this.name = "PagBankApiError";
   }
@@ -43,8 +43,18 @@ export async function pagBankRequest<T>(
     signal: AbortSignal.timeout(15000),
   });
   if (!resposta.ok) {
-    // Não expor resposta bruta do gateway: pode conter dados sensíveis.
-    throw new PagBankApiError(resposta.status, `PagBank retornou HTTP ${resposta.status}`);
+    // Classifique a recusa sem armazenar ou expor o corpo, que pode conter dados pessoais.
+    let liberacaoNecessaria = false;
+    try {
+      const dados = await resposta.json();
+      liberacaoNecessaria = Array.isArray(dados?.error_messages) && dados.error_messages.some(
+        (erro: { error?: unknown; code?: unknown; description?: unknown }) =>
+          [erro.error, erro.code, erro.description].some(valor =>
+            typeof valor === "string" && /(?:allowlist|whitelist)[_ ](?:access[_ ])?required/i.test(valor)
+          ),
+      );
+    } catch {}
+    throw new PagBankApiError(resposta.status, `PagBank retornou HTTP ${resposta.status}`, liberacaoNecessaria);
   }
   return (await resposta.json()) as T;
 }
